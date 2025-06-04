@@ -1,0 +1,214 @@
+/* General styling */
+body {
+  background-color: #F6F4E9;
+  font-family: Arial, sans-serif;
+  color: #333;
+}
+
+.App {
+  text-align: center;
+  padding: 20px;
+}
+
+h1 {
+  font-size: 50px;
+  color: #333;
+  text-align: center;
+}
+
+.offer-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px; /* Adjust spacing between cards */
+  margin: 20px 0;
+}
+
+.offer-card {
+  flex: 0 1 calc(33.33% - 20px); /* 3 cards per row */
+  background-color: #d2e4c7;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  max-width: 300px;
+  margin-left: 60px;
+}
+
+.offer-card img {
+  width: 300px;
+  height: auto;
+  border-radius: 5px;
+}
+
+.offer-card button {
+  margin-top: 10px;
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.offer-card button:hover {
+  background-color: #0056b3;
+}
+
+/* Offer Section Styling */
+.offer-container {
+  margin: 30px 0;
+  gap: 20px; /* Space between cards */
+  margin-left: 50px;
+}
+
+/* Heading Styling */
+.offer-container h2 {
+  font-size: 28px;
+  margin-bottom: 20px;
+  text-align: center; /* Centers the text */
+}
+
+/* Grid for Cards */
+.offer-container .offer-grid {
+  gap: 20px; /* Space between cards */
+  padding: 0 20px; /* Add padding for smaller screens */
+  display: flex;
+  align-items: center; /* Centers the heading and cards */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.offer-card h3 {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin: 10px 0;
+  text-align: center;
+}
+
+.offer-card p {
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.offer-card button {
+  background-color: #4caf50;
+  color: #fff;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: background-color 0.3s ease;
+}
+
+.offer-card button:hover {
+  background-color: #0056b3;
+}
+
+/* Responsive Styling */
+@media (max-width: 768px) {
+  /* Adjust the input box and dropdown for mobile */
+  .creditCardDropdown {
+    max-width: 90%;
+    
+  }
+
+  input[type="text"] {
+    width: 90%;
+    font-size: 14px;
+    
+  }
+
+  /* Offer Cards: Show one card per row */
+  .offer-row {
+    flex-direction: column;
+    gap: 20px; /* Space between cards */
+    align-items: center;
+  }
+
+  .offer-card {
+    flex: 0 1 100%; /* Display one card at a time */
+    max-width: 70%;
+    margin-left: 0;
+  }
+
+  /* Adjust offer card images */
+  .offer-card img {
+    width: 100%;
+    height: auto;
+  }
+
+  /* Adjust heading size */
+  .offer-container h2 {
+    font-size: 15px;
+  }
+
+  /* Adjust text inside offer cards */
+  .offer-card h3 {
+    font-size: 1rem;
+  }
+
+  .offer-card p {
+    font-size: 0.8rem;
+  }
+
+  .offer-card button {
+    font-size: 12px;
+    padding: 8px 16px;
+  }
+
+  /* Adjust the offer section layout */
+  .offer-container {
+    margin-left: 0;
+    padding: 0 10px;
+  }
+}
+
+/* Navbar container */
+.navbar {
+  width: 100%;
+  background-color: #CDD1C1;
+  padding: 10px 20px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+/* Flex container for logo and links */
+.logoContainer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Logo image */
+.logo {
+  height: 60px;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+
+.logo:hover {
+  transform: scale(1.05);
+}
+
+/* Links container */
+.linksContainer {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+/* Navbar link */
+.link {
+  color: black;
+  text-decoration: none;
+  font-weight: 500;
+  margin-right: 2000px;
+  padding: 20px 15px;
+  border-radius: 8px;
+  transition: background-color 0.3s ease;
+}
