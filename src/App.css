@@ -1,9 +1,14 @@
 /* General styling */
 body {
-  background-color: #F6F4E9;
+  background: linear-gradient(to bottom, #999792, #cecdc9);
   font-family: Arial, sans-serif;
   color: #333;
 }
+
+html, body {
+  overflow-x: hidden;
+}
+
 
 .App {
   text-align: center;
@@ -44,7 +49,7 @@ h1 {
 .offer-card button {
   margin-top: 10px;
   padding: 10px 20px;
-  background-color: #007bff;
+  background-color: #1e7145;
   color: white;
   border: none;
   border-radius: 5px;
@@ -168,11 +173,9 @@ h1 {
 
 /* Navbar container */
 .navbar {
-  width: 100%;
   background-color: #CDD1C1;
   padding: 10px 20px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  position: sticky;
   top: 0;
   z-index: 1000;
 }
@@ -182,11 +185,11 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-left: 20px;
 }
 
 /* Logo image */
 .logo {
-  height: 60px;
   object-fit: contain;
   transition: transform 0.3s ease;
 }
@@ -211,4 +214,155 @@ h1 {
   padding: 20px 15px;
   border-radius: 8px;
   transition: background-color 0.3s ease;
+}
+
+/* Add these styles to your existing App.css */
+
+.content-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.title-box {
+  background-color: white;
+  padding: 20px;
+  margin-bottom: 30px;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.title-box h1 {
+  color: black;
+  text-align: center;
+  margin: 0;
+}
+
+.split-section {
+  display: flex;
+  margin-bottom: 30px;
+}
+
+.text-section, .image-section {
+  flex: 1;
+  padding: 20px;
+}
+
+.text-section {
+  padding-right: 40px;
+}
+
+.text-section h2 {
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.text-section p {
+  color: #666;
+  line-height: 1.6;
+}
+
+.image-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.movie-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 5px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.dropdown-section {
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.offers-section {
+  margin-bottom: 40px;
+}
+
+.offers-section h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.offers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.offer-card {
+  background-color: #f9f9f9;
+  padding: 20px;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.offer-card h3 {
+  margin-top: 0;
+  color: #39641D;
+}
+
+.faq-section {
+  display: flex;
+  margin-top: 40px;
+  gap: 20px;
+}
+
+.faq-column {
+  flex: 1;
+  background-color: #f9f9f9;
+  padding: 20px;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.faq-column h3 {
+  margin-top: 0;
+  color: #39641D;
+}
+
+.no-offers-message {
+  text-align: center;
+  margin: 40px 0;
+  font-size: 20px;
+  color: red;
+  font-weight: bold;
+}
+
+.logoContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1200px;
+  margin: 15px 30px;
+  padding: 0 20px;
+  position: absolute;
+}
+
+.logo {
+  height: 60px;
+}
+
+.linksContainer {
+  display: flex;
+  gap: 20px;
+}
+
+.link {
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.navbar{
+  height: 90px;
 }
