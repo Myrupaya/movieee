@@ -1,265 +1,81 @@
-/* General styling */
-body {
-  background: linear-gradient(to bottom, #999792, #cecdc9);
-  font-family: Arial, sans-serif;
-  color: #333;
+/* Base Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 html, body {
-  overflow-x: hidden;
+  height: 100%;
 }
 
+body {
+  font-family: 'Arial', sans-serif;
+  line-height: 1.6;
+  color: #333;
+  background: linear-gradient(to bottom, #999792, #cecdc9) fixed;
+  min-height: 100vh;
+  margin: 0;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
 
 .App {
-  text-align: center;
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
   padding: 20px;
 }
 
+/* Typography */
 h1 {
-  font-size: 50px;
+  font-size: 2.5rem;
   color: #333;
-  text-align: center;
+  margin-bottom: 1rem;
 }
 
-.offer-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 30px; /* Adjust spacing between cards */
-  margin: 20px 0;
+h2 {
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  color: #333;
 }
 
-.offer-card {
-  flex: 0 1 calc(33.33% - 20px); /* 3 cards per row */
-  background-color: #d2e4c7;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 15px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  text-align: center;
-  max-width: 300px;
-  margin-left: 60px;
+h3 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
 }
 
-.offer-card img {
-  width: 300px;
-  height: auto;
-  border-radius: 5px;
+p {
+  margin-bottom: 1rem;
 }
 
-.offer-card button {
-  margin-top: 10px;
-  padding: 10px 20px;
-  background-color: #1e7145;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.offer-card button:hover {
-  background-color: #0056b3;
-}
-
-/* Offer Section Styling */
-.offer-container {
-  margin: 30px 0;
-  gap: 20px; /* Space between cards */
-  margin-left: 50px;
-}
-
-/* Heading Styling */
-.offer-container h2 {
-  font-size: 28px;
-  margin-bottom: 20px;
-  text-align: center; /* Centers the text */
-}
-
-/* Grid for Cards */
-.offer-container .offer-grid {
-  gap: 20px; /* Space between cards */
-  padding: 0 20px; /* Add padding for smaller screens */
-  display: flex;
-  align-items: center; /* Centers the heading and cards */
-  flex-wrap: nowrap;
-  overflow-x: auto;
-}
-
-.offer-card h3 {
-  font-size: 1.2rem;
-  font-weight: bold;
-  margin: 10px 0;
-  text-align: center;
-}
-
-.offer-card p {
-  font-size: 0.9rem;
-  text-align: center;
-}
-
-.offer-card button {
-  background-color: #4caf50;
-  color: #fff;
-  padding: 10px 15px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  margin-top: 10px;
-  transition: background-color 0.3s ease;
-}
-
-.offer-card button:hover {
-  background-color: #0056b3;
-}
-
-/* Responsive Styling */
-@media (max-width: 768px) {
-  /* Adjust the input box and dropdown for mobile */
-  .creditCardDropdown {
-    max-width: 90%;
-    
-  }
-
-  input[type="text"] {
-    width: 90%;
-    font-size: 14px;
-    
-  }
-
-  /* Offer Cards: Show one card per row */
-  .offer-row {
-    flex-direction: column;
-    gap: 20px; /* Space between cards */
-    align-items: center;
-  }
-
-  .offer-card {
-    flex: 0 1 100%; /* Display one card at a time */
-    max-width: 70%;
-    margin-left: 0;
-  }
-
-  /* Adjust offer card images */
-  .offer-card img {
-    width: 100%;
-    height: auto;
-  }
-
-  /* Adjust heading size */
-  .offer-container h2 {
-    font-size: 15px;
-  }
-
-  /* Adjust text inside offer cards */
-  .offer-card h3 {
-    font-size: 1rem;
-  }
-
-  .offer-card p {
-    font-size: 0.8rem;
-  }
-
-  .offer-card button {
-    font-size: 12px;
-    padding: 8px 16px;
-  }
-
-  /* Adjust the offer section layout */
-  .offer-container {
-    margin-left: 0;
-    padding: 0 10px;
-  }
-}
-
-/* Navbar container */
-.navbar {
-  background-color: #CDD1C1;
-  padding: 10px 20px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-  top: 0;
-  z-index: 1000;
-}
-
-/* Flex container for logo and links */
-.logoContainer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-left: 20px;
-}
-
-/* Logo image */
-.logo {
-  object-fit: contain;
-  transition: transform 0.3s ease;
-}
-
-.logo:hover {
-  transform: scale(1.05);
-}
-
-/* Links container */
-.linksContainer {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-/* Navbar link */
-.link {
-  color: black;
-  text-decoration: none;
-  font-weight: 500;
-  margin-right: 2000px;
-  padding: 20px 15px;
-  border-radius: 8px;
-  transition: background-color 0.3s ease;
-}
-
-/* Add these styles to your existing App.css */
-
+/* Layout Components */
 .content-container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
+  background-color: transparent;
 }
 
 .title-box {
   background-color: white;
-  padding: 20px;
+  padding: 2px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   margin-bottom: 30px;
-  border-radius: 5px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-
-.title-box h1 {
-  color: black;
   text-align: center;
-  margin: 0;
 }
 
 .split-section {
   display: flex;
+  flex-wrap: wrap;
+  gap: 30px;
   margin-bottom: 30px;
 }
 
 .text-section, .image-section {
   flex: 1;
-  padding: 20px;
-}
-
-.text-section {
-  padding-right: 40px;
-}
-
-.text-section h2 {
-  color: #333;
-  margin-bottom: 15px;
-}
-
-.text-section p {
-  color: #666;
-  line-height: 1.6;
+  min-width: 300px;
 }
 
 .image-section {
@@ -271,68 +87,128 @@ h1 {
 .movie-image {
   max-width: 100%;
   height: auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Search/Dropdown Styles */
+.creditCardDropdown {
+  position: relative;
+  width: 90%;
+  max-width: 500px;
+  margin: 0 auto 30px;
+}
+
+.creditCardDropdown input {
+  width: 90%;
+  padding: 12px 15px;
+  font-size: 1rem;
+  border: 1px solid #ccc;
   border-radius: 5px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  transition: border-color 0.3s;
 }
 
-.dropdown-section {
-  margin-bottom: 30px;
-  text-align: center;
+.creditCardDropdown input:focus {
+  outline: none;
+  border-color: #39641D;
 }
 
-.offers-section {
+.dropdown-heading {
+  font-weight: bold;
+  padding: 10px;
+  background-color: #f0f0f0;
+  border-bottom: 1px solid #ddd;
+}
+
+/* Offer Section Styles */
+.offer-section {
+  margin-top: 30px;
+}
+
+.offer-container {
   margin-bottom: 40px;
 }
 
-.offers-section h2 {
-  text-align: center;
-  margin-bottom: 20px;
-  color: #333;
-}
-
-.offers-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+.offer-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 20px;
+  margin-top: 20px;
 }
 
 .offer-card {
-  background-color: #f9f9f9;
+  flex: 1 1 300px;
+  max-width: 350px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
   padding: 20px;
-  border-radius: 5px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s, box-shadow 0.3s;
 }
 
-.offer-card h3 {
-  margin-top: 0;
+.offer-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+}
+
+.offer-card img {
+  width: 100%;
+  max-height: 150px;
+  object-fit: contain;
+  border-radius: 5px;
+  margin-bottom: 15px;
+}
+
+/* Button Styles */
+button, .view-details-btn {
+  padding: 10px 20px;
+  background-color: #1e7145;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.3s;
+  margin-top: 10px;
+  display: inline-block;
+}
+
+button:hover, .view-details-btn:hover {
+  background-color: #2a4e16;
+}
+
+.details-btn {
+  background-color: #39641D;
+  color: white;
+}
+
+.details-btn.active {
+  background-color: #2a4e16;
+}
+
+/* Special Card Styles */
+.offer-card[style*="#39641D"] {
+  color: white;
+}
+
+.offer-card[style*="#39641D"] button {
+  background-color: white;
   color: #39641D;
 }
 
-.faq-section {
-  display: flex;
-  margin-top: 40px;
-  gap: 20px;
+.offer-card[style*="#39641D"] button:hover {
+  background-color: #f5f5f5;
 }
 
-.faq-column {
-  flex: 1;
-  background-color: #f9f9f9;
-  padding: 20px;
-  border-radius: 5px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
-
-.faq-column h3 {
-  margin-top: 0;
-  color: #39641D;
-}
-
-.no-offers-message {
-  text-align: center;
-  margin: 40px 0;
-  font-size: 20px;
-  color: red;
-  font-weight: bold;
+/* Navbar Styles */
+.navbar {
+  background-color: #CDD1C1;
+  padding: 15px 20px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
 }
 
 .logoContainer {
@@ -340,13 +216,16 @@ h1 {
   justify-content: space-between;
   align-items: center;
   max-width: 1200px;
-  margin: 15px 30px;
-  padding: 0 20px;
-  position: absolute;
+  margin: 0 auto;
 }
 
 .logo {
   height: 60px;
+  transition: transform 0.3s;
+}
+
+.logo:hover {
+  transform: scale(1.05);
 }
 
 .linksContainer {
@@ -355,148 +234,97 @@ h1 {
 }
 
 .link {
+  color: #333;
   text-decoration: none;
   font-weight: bold;
+  padding: 5px 10px;
+  border-radius: 5px;
+  transition: background-color 0.3s;
 }
 
 .link:hover {
-  text-decoration: underline;
-}
-
-.navbar{
-  height: 90px;
-}
-
-/* Mobile-first base styles */
-@media (max-width: 767px) {
-  .navbar {
-  padding: 10px;
-  background-color: #CDD1C1;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-}
-
-.logo {
-  height: 40px;
-}
-
-.logo-container {
-  display: flex;
-  flex-direction: row;
-  gap: 2px;
-  align-items: center;
-}
-
-.nav-link {
-  padding: 10px;
-  margin-right: 0;
+  background-color: rgba(0, 0, 0, 0.1);
   text-decoration: none;
-  color: black;
-  font-weight: bold;
 }
 
-.title-box {
-  padding: 15px;
-  background-color: white;
-  border-radius: 5px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-  margin-bottom: 20px;
-}
-
-.title-box h1 {
-  font-size: 1.5rem;
-  margin: 0;
-  color: black;
-}
-
-.text-section h2 {
-  font-size: 1.3rem;
-  color: #333;
-  margin-bottom: 10px;
-}
-
-.search-input {
-  width: 100%;
-  font-size: 14px;
-  padding: 8px 12px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-}
-
-     .split-section {
-        flex-direction: column;
-    }
-
-
-.split-section {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
-    margin-bottom: 30px;
-}
-
-.card-details {
-  padding: 10px;
-}
-
-.offer-cards {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 15px;
-  margin: 20px 0;
-}
-
-.offer-card {
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  padding: 15px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+/* Utility Classes */
+.text-center {
   text-align: center;
 }
 
-.offer-image {
-  width: 60px;
-  height: 60px;
-  object-fit: contain;
-  margin-bottom: 10px;
+.no-offers-message {
+  text-align: center;
+  margin: 40px 0;
+  font-size: 1.25rem;
+  color: #666;
 }
 
-.offer-details h3 {
-  font-size: 14px;
-  margin: 5px 0;
-}
-
-.faq-column {
-  background-color: #f9f9f9;
-  padding: 15px;
-  border-radius: 5px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-  margin-bottom: 15px;
-}
-.faq-section{
-  display: flex;
-  flex-direction: column;
-}
-}
-
-
-/* Tablet styles (768px - 1023px) */
-@media (min-width: 768px) and (max-width: 1023px) {
-  .offer-cards {
-    grid-template-columns: repeat(2, 1fr);
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .split-section {
+    flex-direction: column;
+  }
+  
+  .text-section, .image-section {
+    width: 100%;
   }
   
   .offer-card {
-    flex-direction: row;
-    text-align: left;
+    flex: 1 1 100%;
+  }
+  
+  .navbar {
+    padding: 10px;
+  }
+  
+  .logo {
+    height: 40px;
+  }
+  
+  .linksContainer {
+    gap: 10px;
+  }
+  
+  h1 {
+    font-size: 2rem;
+  }
+  
+  h2 {
+    font-size: 1.5rem;
   }
 }
 
-/* Desktop styles (1024px and up) */
-@media (min-width: 1024px) {
-  .offer-cards {
-    grid-template-columns: repeat(3, 1fr);
+@media (max-width: 480px) {
+  .content-container {
+    padding: 15px;
+  }
+  
+  .title-box {
+    padding: 15px;
+  }
+  
+  .offer-card {
+    padding: 15px;
+  }
+  
+  .logoContainer {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .linksContainer {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .creditCardDropdown{
+    width: 90%;
+    
+  max-width: 350px;
+  }
+  .creditCardDropdown input{
+    width: 90%;
+    
+  max-width: 350px;
   }
 }

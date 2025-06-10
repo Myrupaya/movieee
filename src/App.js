@@ -196,22 +196,6 @@ const CreditCardDropdown = () => {
 
   return (
     <div className="App">
-      <nav className="navbar">
-        <div className="logoContainer">
-          <a href="https://www.myrupaya.in/">
-            <img
-              src="https://static.wixstatic.com/media/f836e8_26da4bf726c3475eabd6578d7546c3b2~mv2.jpg/v1/crop/x_124,y_0,w_3152,h_1458/fill/w_909,h_420,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/dark_logo_white_background.jpg"
-              alt="MyRupaya Logo"
-              className="logo"
-            />
-          </a>
-          <div className="linksContainer">
-            <a href="https://www.myrupaya.in/" className="link">
-              Home
-            </a>
-          </div>
-        </div>
-      </nav>
 
       <div className="content-container">
         {/* Title section in white box */}
@@ -245,7 +229,7 @@ const CreditCardDropdown = () => {
             onChange={handleInputChange}
             placeholder="Type a Credit/Debit Card..."
             style={{
-              width: "100%",
+              width: "90%",
               padding: "12px",
               fontSize: "16px",
               border: `1px solid ${showNoCardMessage ? 'red' : '#ccc'}`,
@@ -258,7 +242,7 @@ const CreditCardDropdown = () => {
                 listStyleType: "none",
                 padding: "10px",
                 margin: 0,
-                width: "100%",
+                width: "90%",
                 maxHeight: "200px",
                 overflowY: "auto",
                 border: "1px solid #ccc",
@@ -601,21 +585,7 @@ const CreditCardDropdown = () => {
           
           </div>    )}
           
-            {/* 3-column FAQ section */}
-            <div className="faq-section">
-              <div className="faq-column">
-                <h3>Question 1</h3>
-                <p>Answer to question 1 goes here. This should provide helpful information about movie offers.</p>
-              </div>
-              <div className="faq-column">
-                <h3>Question 2</h3>
-                <p>Answer to question 2 goes here. This should provide helpful information about movie offers.</p>
-              </div>
-              <div className="faq-column">
-                <h3>Question 3</h3>
-                <p>Answer to question 3 goes here. This should provide helpful information about movie offers.</p>
-              </div>
-            </div>
+
      
       </div>
     </div>
