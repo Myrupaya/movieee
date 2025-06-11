@@ -197,30 +197,7 @@ const CreditCardDropdown = () => {
   return (
     <div className="App">
 
-      <div className="content-container">
-        {/* Title section in white box */}
-        <div className="title-box">
-          <h1>Movie Offers</h1>
-        </div>
 
-        {/* 50-50 split section */}
-        <div className="split-section">
-          <div className="text-section">
-            <h2>Find the Best Movie Offers</h2>
-            <p>
-              Discover exclusive movie offers and discounts available with your credit or debit cards. 
-              Whether you're planning to visit PVR, INOX, or BookMyShow, we've got you covered with 
-              the latest deals and promotions to enhance your movie experience.
-            </p>
-          </div>
-          <div className="image-section">
-            <img 
-              src="https://via.placeholder.com/500x300?text=Movie+Offers" 
-              alt="Movie Offers" 
-              className="movie-image"
-            />
-          </div>
-        </div>
 
         <div className="creditCardDropdown" style={{ position: "relative", width: "600px", margin: "0 auto" }}>
           <input
