@@ -197,7 +197,7 @@ const CreditCardDropdown = () => {
   return (
     <div className="App">
 
-
+      <div className="content-container">
 
         <div className="creditCardDropdown" style={{ position: "relative", width: "600px", margin: "0 auto" }}>
           <input
