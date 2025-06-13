@@ -309,7 +309,8 @@ const CreditCardDropdown = () => {
                   {selectedPvrOffers.map((offer, index) => (
                     <div 
                       key={pvr-${index}} 
-                      className={offer-card ${expandedOfferIndex.pvr === index ? 'expanded' : ''}}
+                      className={`offer-card ${expandedOfferIndex.pvr === index ? "expanded" : ""}`} ✅
+
                       style={{
                         backgroundColor: "#f5f5f5", 
                         color: "black",
