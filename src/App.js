@@ -232,10 +232,10 @@ const CreditCardDropdown = () => {
             >
               {filteredCards.map((item, index) =>
                 item.type === "heading" ? (
-                  <li key={`heading-${index}`} className="dropdown-heading"><strong>{item.label}</strong></li>
+                  <li key={index} className="dropdown-heading"><strong>{item.label}</strong></li>
                 ) : (
                   <li
-                    key={`card-${item.card}-${index}`}
+                    key={index}
                     onClick={() => handleCardSelection(item.card)}
                     style={{
                       padding: "10px",
@@ -265,7 +265,7 @@ const CreditCardDropdown = () => {
           </div>
         )}
 
-                      {selectedCard && hasAnyOffers() && (
+               {selectedCard && hasAnyOffers() && (
           <div className="offer-section">
             {selectedMovieBenefits.length > 0 && (
               <div className="offer-container">
@@ -542,10 +542,9 @@ const CreditCardDropdown = () => {
 
           
           </div>    )}
-
       </div>
     </div>
   );
 };
 
-export default CreditCardDropdown;
+export default CreditCardDropdown;      
