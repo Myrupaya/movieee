@@ -14,7 +14,11 @@ const CreditCardDropdown = () => {
   const [bookMyShowOffers, setBookMyShowOffers] = useState([]);
   const [movieDebitOffers, setMovieDebitOffers] = useState([]);
   const [movieBenefits, setMovieBenefits] = useState([]);
-  const [expandedOfferIndex, setExpandedOfferIndex] = useState({ pvr: null, inox: null, bms: null });
+  const [expandedOfferIndex, setExpandedOfferIndex] = useState({ 
+    pvr: null, 
+    inox: null, 
+    bms: null 
+  });
   const [showNoCardMessage, setShowNoCardMessage] = useState(false);
   const [typingTimeout, setTypingTimeout] = useState(null);
 
@@ -56,13 +60,24 @@ const CreditCardDropdown = () => {
         });
 
         const otherCreditCards = new Set();
-        [pvrData, inoxData, bmsData].forEach(data =>
-          data.data.forEach(row => {
-            if (row["Credit Card"]) {
-              otherCreditCards.add(row["Credit Card"].trim());
-            }
-          })
-        );
+        
+        pvrData.data.forEach(row => {
+          if (row["Credit Card"]) {
+            otherCreditCards.add(row["Credit Card"].trim());
+          }
+        });
+        
+        inoxData.data.forEach(row => {
+          if (row["Credit Card"]) {
+            otherCreditCards.add(row["Credit Card"].trim());
+          }
+        });
+        
+        bmsData.data.forEach(row => {
+          if (row["Credit Card"]) {
+            otherCreditCards.add(row["Credit Card"].trim());
+          }
+        });
 
         const allCreditCards = new Set([...benefitsCreditCards, ...otherCreditCards]);
 
@@ -90,7 +105,9 @@ const CreditCardDropdown = () => {
     setQuery(value);
     setShowNoCardMessage(false);
 
-    if (typingTimeout) clearTimeout(typingTimeout);
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
+    }
 
     if (!value) {
       setSelectedCard("");
@@ -99,27 +116,33 @@ const CreditCardDropdown = () => {
     }
 
     const queryWords = value.toLowerCase().split(/\s+/).filter(word => word.length > 0);
-    const filteredCredit = creditCards.filter(card =>
-      queryWords.every(word => card.toLowerCase().includes(word))
-    );
-    const filteredDebit = debitCards.filter(card =>
-      queryWords.every(word => card.toLowerCase().includes(word))
-    );
+    
+    const filteredCredit = creditCards.filter((card) => {
+      const cardLower = card.toLowerCase();
+      return queryWords.every(word => cardLower.includes(word));
+    });
+    
+    const filteredDebit = debitCards.filter((card) => {
+      const cardLower = card.toLowerCase();
+      return queryWords.every(word => cardLower.includes(word));
+    });
 
     const combinedResults = [];
     if (filteredCredit.length > 0) {
       combinedResults.push({ type: "heading", label: "Credit Cards" });
-      combinedResults.push(...filteredCredit.map(card => ({ type: "credit", card })));
+      combinedResults.push(...filteredCredit.map((card) => ({ type: "credit", card })));
     }
     if (filteredDebit.length > 0) {
       combinedResults.push({ type: "heading", label: "Debit Cards" });
-      combinedResults.push(...filteredDebit.map(card => ({ type: "debit", card })));
+      combinedResults.push(...filteredDebit.map((card) => ({ type: "debit", card })));
     }
 
     setFilteredCards(combinedResults);
 
     if (combinedResults.length === 0 && value.length > 2) {
-      const timeout = setTimeout(() => setShowNoCardMessage(true), 1000);
+      const timeout = setTimeout(() => {
+        setShowNoCardMessage(true);
+      }, 1000);
       setTypingTimeout(timeout);
     }
   };
@@ -130,41 +153,29 @@ const CreditCardDropdown = () => {
     setFilteredCards([]);
     setExpandedOfferIndex({ pvr: null, inox: null, bms: null });
     setShowNoCardMessage(false);
-    if (typingTimeout) clearTimeout(typingTimeout);
-  };
-
-  const handlePasteFromClipboard = async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      const trimmedText = text.trim();
-      setQuery(trimmedText);
-
-      const matchInCredit = creditCards.find(card => card.toLowerCase() === trimmedText.toLowerCase());
-      const matchInDebit = debitCards.find(card => card.toLowerCase() === trimmedText.toLowerCase());
-
-      if (matchInCredit || matchInDebit) {
-        handleCardSelection(matchInCredit || matchInDebit);
-      } else {
-        setShowNoCardMessage(true);
-      }
-    } catch (err) {
-      console.error("Clipboard read failed:", err);
-      alert("Clipboard access denied. Please allow clipboard permission.");
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
     }
   };
 
   const getOffersForSelectedCard = (offers, isDebit = false) => {
-    return offers.filter(offer =>
-      isDebit
-        ? offer["Applicable Debit Cards"]?.split(",").map(c => c.trim()).includes(selectedCard)
-        : offer["Credit Card"]?.trim() === selectedCard
-    );
+    return offers.filter((offer) => {
+      if (isDebit) {
+        return (
+          offer["Applicable Debit Cards"] &&
+          offer["Applicable Debit Cards"].split(",").map((c) => c.trim()).includes(selectedCard)
+        );
+      } else {
+        return offer["Credit Card"] && offer["Credit Card"].trim() === selectedCard;
+      }
+    });
   };
 
   const getMovieBenefitsForSelectedCard = () => {
-    return movieBenefits.filter(
-      offer => offer["Credit Card Name"]?.trim().toLowerCase() === selectedCard.toLowerCase()
-    );
+    return movieBenefits.filter(offer => {
+      const cardName = offer["Credit Card Name"] ? offer["Credit Card Name"].trim() : "";
+      return cardName.toLowerCase() === selectedCard.toLowerCase();
+    });
   };
 
   const selectedPvrOffers = getOffersForSelectedCard(pvrOffers);
@@ -173,47 +184,35 @@ const CreditCardDropdown = () => {
   const selectedMovieDebitOffers = getOffersForSelectedCard(movieDebitOffers, true);
   const selectedMovieBenefits = getMovieBenefitsForSelectedCard();
 
-  const hasAnyOffers = () =>
-    selectedPvrOffers.length ||
-    selectedInoxOffers.length ||
-    selectedBookMyShowOffers.length ||
-    selectedMovieDebitOffers.length ||
-    selectedMovieBenefits.length;
+  const hasAnyOffers = () => {
+    return (
+      selectedPvrOffers.length > 0 ||
+      selectedInoxOffers.length > 0 ||
+      selectedBookMyShowOffers.length > 0 ||
+      selectedMovieDebitOffers.length > 0 ||
+      selectedMovieBenefits.length > 0
+    );
+  };
 
   return (
     <div className="App">
-      <div className="content-container">
-        <div className="creditCardDropdown" style={{ position: "relative", width: "600px", margin: "0 auto" }}>
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            <input
-              type="text"
-              value={query}
-              onChange={handleInputChange}
-              placeholder="Type a Credit/Debit Card..."
-              style={{
-                width: "80%",
-                padding: "12px",
-                fontSize: "16px",
-                border: `1px solid ${showNoCardMessage ? 'red' : '#ccc'}`,
-                borderRadius: "5px"
-              }}
-            />
-            <button
-              onClick={handlePasteFromClipboard}
-              style={{
-                padding: "12px 16px",
-                fontSize: "14px",
-                cursor: "pointer",
-                borderRadius: "5px",
-                backgroundColor: "#39641D",
-                color: "white",
-                border: "none"
-              }}
-            >
-              Paste from Clipboard
-            </button>
-          </div>
 
+      <div className="content-container">
+
+        <div className="creditCardDropdown" style={{ position: "relative", width: "600px", margin: "0 auto" }}>
+          <input
+            type="text"
+            value={query}
+            onChange={handleInputChange}
+            placeholder="Type a Credit/Debit Card..."
+            style={{
+              width: "90%",
+              padding: "12px",
+              fontSize: "16px",
+              border: 1px solid ${showNoCardMessage ? 'red' : '#ccc'},
+              borderRadius: "5px",
+            }}
+          />
           {filteredCards.length > 0 && (
             <ul
               style={{
@@ -232,7 +231,9 @@ const CreditCardDropdown = () => {
             >
               {filteredCards.map((item, index) =>
                 item.type === "heading" ? (
-                  <li key={index} className="dropdown-heading"><strong>{item.label}</strong></li>
+                  <li key={index} className="dropdown-heading">
+                    <strong>{item.label}</strong>
+                  </li>
                 ) : (
                   <li
                     key={index}
@@ -240,10 +241,17 @@ const CreditCardDropdown = () => {
                     style={{
                       padding: "10px",
                       cursor: "pointer",
-                      borderBottom: index !== filteredCards.length - 1 ? "1px solid #eee" : "none",
+                      borderBottom:
+                        index !== filteredCards.length - 1
+                          ? "1px solid #eee"
+                          : "none",
                     }}
-                    onMouseOver={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-                    onMouseOut={(e) => (e.target.style.backgroundColor = "transparent")}
+                    onMouseOver={(e) =>
+                      (e.target.style.backgroundColor = "#f0f0f0")
+                    }
+                    onMouseOut={(e) =>
+                      (e.target.style.backgroundColor = "transparent")
+                    }
                   >
                     {item.card}
                   </li>
@@ -254,18 +262,29 @@ const CreditCardDropdown = () => {
         </div>
 
         {showNoCardMessage && (
-          <div style={{ textAlign: "center", margin: "40px 0", fontSize: "20px", color: "red", fontWeight: "bold" }}>
+          <div style={{
+            textAlign: "center",
+            margin: "40px 0",
+            fontSize: "20px",
+            color: "red",
+            fontWeight: "bold"
+          }}>
             No offers for this card
           </div>
         )}
 
         {selectedCard && !hasAnyOffers() && !showNoCardMessage && (
-          <div style={{ textAlign: "center", margin: "40px 0", fontSize: "20px", color: "#666" }}>
+          <div style={{
+            textAlign: "center",
+            margin: "40px 0",
+            fontSize: "20px",
+            color: "#666"
+          }}>
             No offers found for {selectedCard}
           </div>
         )}
 
-               {selectedCard && hasAnyOffers() && (
+        {selectedCard && hasAnyOffers() && (
           <div className="offer-section">
             {selectedMovieBenefits.length > 0 && (
               <div className="offer-container">
@@ -309,8 +328,7 @@ const CreditCardDropdown = () => {
                   {selectedPvrOffers.map((offer, index) => (
                     <div 
                       key={pvr-${index}} 
-                      className={`offer-card ${expandedOfferIndex.pvr === index ? "expanded" : ""}`} ✅
-
+                      className={offer-card ${expandedOfferIndex.pvr === index ? 'expanded' : ''}}
                       style={{
                         backgroundColor: "#f5f5f5", 
                         color: "black",
@@ -543,9 +561,12 @@ const CreditCardDropdown = () => {
 
           
           </div>    )}
+          
+
+     
       </div>
     </div>
   );
 };
 
-export default CreditCardDropdown;      
+export default CreditCardDropdown;  
