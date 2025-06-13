@@ -30,6 +30,24 @@ const CreditCardDropdown = () => {
   };
 
   useEffect(() => {
+  const handleIframeMessage = (event) => {
+    // Optional: check event.origin to validate source
+    const { cardName } = event.data || {};
+
+    if (typeof cardName === "string" && cardName.trim()) {
+      handleCardSelection(cardName.trim());
+    }
+  };
+
+  window.addEventListener("message", handleIframeMessage);
+
+  return () => {
+    window.removeEventListener("message", handleIframeMessage);
+  };
+}, []);
+
+
+  useEffect(() => {
     const fetchCSVData = async () => {
       try {
         const [pvrResponse, inoxResponse, bmsResponse, debitResponse, benefitsResponse] = await Promise.all([
@@ -147,16 +165,16 @@ const CreditCardDropdown = () => {
     }
   };
 
-  const handleCardSelection = (card) => {
-    setSelectedCard(card);
-    setQuery(card);
-    setFilteredCards([]);
-    setExpandedOfferIndex({ pvr: null, inox: null, bms: null });
-    setShowNoCardMessage(false);
-    if (typingTimeout) {
-      clearTimeout(typingTimeout);
-    }
-  };
+const handleCardSelection = (card) => {
+  setSelectedCard(card);
+  setQuery(card);
+  setFilteredCards([]);
+  setExpandedOfferIndex({ pvr: null, inox: null, bms: null });
+  setShowNoCardMessage(false);
+  if (typingTimeout) {
+    clearTimeout(typingTimeout);
+  }
+};
 
   const getOffersForSelectedCard = (offers, isDebit = false) => {
     return offers.filter((offer) => {
