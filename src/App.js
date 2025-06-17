@@ -196,9 +196,7 @@ const CreditCardDropdown = () => {
 
   return (
     <div className="App">
-
       <div className="content-container">
-
         <div className="creditCardDropdown" style={{ position: "relative", width: "600px", margin: "0 auto" }}>
           <input
             type="text"
@@ -209,7 +207,7 @@ const CreditCardDropdown = () => {
               width: "90%",
               padding: "12px",
               fontSize: "16px",
-              border: 1px solid ${showNoCardMessage ? 'red' : '#ccc'},
+              border: `1px solid ${showNoCardMessage ? 'red' : '#ccc'}`,
               borderRadius: "5px",
             }}
           />
@@ -291,7 +289,7 @@ const CreditCardDropdown = () => {
                 <h2 style={{ textAlign: "center", margin: "20px 0" }}>Permanent Offers on {selectedCard}</h2>
                 <div className="offer-row">
                   {selectedMovieBenefits.map((benefit, index) => (
-                    <div key={benefit-${index}} className="offer-card" style={{backgroundColor: "#39641D", color: "white"}}>
+                    <div key={`benefit-${index}`} className="offer-card" style={{backgroundColor: "#39641D", color: "white"}}>
                       {benefit.image && (
                         <img 
                           src={benefit.image} 
@@ -327,8 +325,8 @@ const CreditCardDropdown = () => {
                 <div className="offer-row">
                   {selectedPvrOffers.map((offer, index) => (
                     <div 
-                      key={pvr-${index}} 
-                      className={offer-card ${expandedOfferIndex.pvr === index ? 'expanded' : ''}}
+                      key={`pvr-${index}`} 
+                      className={`offer-card ${expandedOfferIndex.pvr === index ? 'expanded' : ''}`}
                       style={{
                         backgroundColor: "#f5f5f5", 
                         color: "black",
@@ -367,7 +365,7 @@ const CreditCardDropdown = () => {
                       
                       <button 
                         onClick={() => toggleOfferDetails("pvr", index)}
-                        className={details-btn ${expandedOfferIndex.pvr === index ? "active" : ""}}
+                        className={`details-btn ${expandedOfferIndex.pvr === index ? "active" : ""}`}
                         style={{ marginTop: '10px' }}
                       >
                         {expandedOfferIndex.pvr === index ? "Hide Details" : "Click For More Details"}
@@ -384,8 +382,8 @@ const CreditCardDropdown = () => {
                 <div className="offer-row">
                   {selectedInoxOffers.map((offer, index) => (
                     <div 
-                      key={inox-${index}} 
-                      className={offer-card ${expandedOfferIndex.inox === index ? 'expanded' : ''}}
+                      key={`inox-${index}`} 
+                      className={`offer-card ${expandedOfferIndex.inox === index ? 'expanded' : ''}`}
                       style={{
                         backgroundColor: "#f5f5f5", 
                         color: "black",
@@ -424,7 +422,7 @@ const CreditCardDropdown = () => {
                       
                       <button 
                         onClick={() => toggleOfferDetails("inox", index)}
-                        className={details-btn ${expandedOfferIndex.inox === index ? "active" : ""}}
+                        className={`details-btn ${expandedOfferIndex.inox === index ? "active" : ""}`}
                         style={{ marginTop: '10px' }}
                       >
                         {expandedOfferIndex.inox === index ? "Hide Details" : "Click For More Details"}
@@ -441,8 +439,8 @@ const CreditCardDropdown = () => {
                 <div className="offer-row">
                   {selectedBookMyShowOffers.map((offer, index) => (
                     <div 
-                      key={bms-${index}} 
-                      className={offer-card ${expandedOfferIndex.bms === index ? 'expanded' : ''}}
+                      key={`bms-${index}`} 
+                      className={`offer-card ${expandedOfferIndex.bms === index ? 'expanded' : ''}`}
                       style={{
                         backgroundColor: "#f5f5f5", 
                         color: "black",
@@ -497,7 +495,7 @@ const CreditCardDropdown = () => {
                       ) : (
                         <button 
                           onClick={() => toggleOfferDetails("bms", index)}
-                          className={details-btn ${expandedOfferIndex.bms === index ? "active" : ""}}
+                          className={`details-btn ${expandedOfferIndex.bms === index ? "active" : ""}`}
                           style={{ marginTop: '10px' }}
                         >
                           {expandedOfferIndex.bms === index ? "Hide Details" : "Click For More Details"}
@@ -515,7 +513,7 @@ const CreditCardDropdown = () => {
                 <div className="offer-row">
                   {selectedMovieDebitOffers.map((offer, index) => (
                     <div 
-                      key={debit-${index}} 
+                      key={`debit-${index}`} 
                       className="offer-card" 
                       style={{ backgroundColor: "#39641D", color: "white" }}
                     >
@@ -558,15 +556,11 @@ const CreditCardDropdown = () => {
                 </div>
               </div>
             )}
-
-          
-          </div>    )}
-          
-
-     
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-export default CreditCardDropdown;  
+export default CreditCardDropdown;
