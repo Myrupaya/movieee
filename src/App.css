@@ -13,11 +13,16 @@ body {
   font-family: 'Arial', sans-serif;
   line-height: 1.6;
   color: #333;
-  background: linear-gradient(to bottom, #999792, #cecdc9) fixed;
   min-height: 100vh;
   margin: 0;
   background-repeat: no-repeat;
   background-attachment: fixed;
+}
+
+body {
+  @apply min-h-screen;
+  background: linear-gradient(135deg, #F8F9FA 3%, #E9ECEF 100%, #CECDC9 100%);
+
 }
 
 .App {
