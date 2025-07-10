@@ -197,12 +197,12 @@ const CreditCardDropdown = () => {
   return (
     <div className="App">
       <div className="content-container">
-        <div className="creditCardDropdown" style={{ position: "relative", width: "600px", margin: "0 auto" }}>
+        <div className="creditCardDropdown" style={{ position: "relative", width: "600px", margin: "2px auto", marginTop:"2px" }}>
           <input
             type="text"
             value={query}
             onChange={handleInputChange}
-            placeholder="Type a Credit/Debit Card..."
+            placeholder="Type a Credit Card..."
             style={{
               width: "90%",
               padding: "12px",
