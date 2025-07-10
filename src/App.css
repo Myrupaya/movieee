@@ -302,6 +302,7 @@ button:hover, .view-details-btn:hover {
 @media (max-width: 480px) {
   .content-container {
     padding: 15px;
+    margin-top: 2px;
   }
   
   .title-box {
@@ -326,10 +327,12 @@ button:hover, .view-details-btn:hover {
     width: 90%;
     
   max-width: 350px;
+  margin-top: 2px;
   }
   .creditCardDropdown input{
     width: 90%;
     
   max-width: 350px;
+  margin-top: 2px;
   }
 }
