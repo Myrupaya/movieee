@@ -30,6 +30,7 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   padding: 20px;
+  background: linear-gradient(135deg, #F8F9FA 3%, #E9ECEF 100%, #CECDC9 100%)
 }
 
 /* Typography */
