@@ -169,7 +169,7 @@ p {
 button, .view-details-btn {
   padding: 10px 20px;
   background-color: #1e7145;
-  color: white;
+  color: #fff;
   border: none;
   border-radius: 5px;
   cursor: pointer;
@@ -180,16 +180,16 @@ button, .view-details-btn {
 }
 
 button:hover, .view-details-btn:hover {
-  background-color: #2a4e16;
+  background-color: #1e7145;
 }
 
 .details-btn {
-  background-color: #39641D;
-  color: white;
+  background-color: #1e7145;
+  color: fff;
 }
 
 .details-btn.active {
-  background-color: #2a4e16;
+  background-color: #1e7145
 }
 
 /* Special Card Styles */
@@ -198,12 +198,12 @@ button:hover, .view-details-btn:hover {
 }
 
 .offer-card[style*="#39641D"] button {
-  background-color: white;
-  color: #39641D;
+  background-color: #1e7145;
+  color: #fff;
 }
 
 .offer-card[style*="#39641D"] button:hover {
-  background-color: #f5f5f5;
+  background-color: #1e7145;
 }
 
 /* Navbar Styles */

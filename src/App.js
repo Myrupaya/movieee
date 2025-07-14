@@ -21,6 +21,26 @@ const CreditCardDropdown = () => {
   });
   const [showNoCardMessage, setShowNoCardMessage] = useState(false);
   const [typingTimeout, setTypingTimeout] = useState(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 100;
+      setShowScrollButton(!nearBottom);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Check initial position
+    
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const handleScrollDown = () => {
+    window.scrollBy({
+      top: window.innerHeight * 0.8,
+      behavior: 'smooth'
+    });
+  };
 
   const toggleOfferDetails = (type, index) => {
     setExpandedOfferIndex(prev => ({
@@ -289,7 +309,7 @@ const CreditCardDropdown = () => {
                 <h2 style={{ textAlign: "center", margin: "20px 0" }}>Permanent Offers on {selectedCard}</h2>
                 <div className="offer-row">
                   {selectedMovieBenefits.map((benefit, index) => (
-                    <div key={`benefit-${index}`} className="offer-card" style={{backgroundColor: "#39641D", color: "white"}}>
+                    <div key={`benefit-${index}`} className="offer-card" style={{backgroundColor: "#f5f5f5", color: "black"}}>
                       {benefit.image && (
                         <img 
                           src={benefit.image} 
@@ -444,7 +464,7 @@ const CreditCardDropdown = () => {
                       style={{
                         backgroundColor: "#f5f5f5", 
                         color: "black",
-                        height: expandedOfferIndex.bms === index ? 'auto' : '400px',
+                        height: "auto",
                         overflow: 'hidden'
                       }}
                     >
@@ -515,7 +535,7 @@ const CreditCardDropdown = () => {
                     <div 
                       key={`debit-${index}`} 
                       className="offer-card" 
-                      style={{ backgroundColor: "#39641D", color: "white" }}
+                      style={{ backgroundColor: "#f5f5f5", color: "black" }}
                     >
                       {offer.Image && (
                         <img 
@@ -526,7 +546,7 @@ const CreditCardDropdown = () => {
                             height: "auto",
                             maxHeight: "150px",
                             objectFit: "contain"
-                          }} 
+                          }}
                         />
                       )}
                       <h3>{offer.Website || "Debit Card Offer"}</h3>
@@ -540,8 +560,8 @@ const CreditCardDropdown = () => {
                           style={{
                             display: "inline-block",
                             padding: "10px 20px",
-                            backgroundColor: "white",
-                            color: "#39641D",
+                            backgroundColor: "#1e7145",
+                            color: "#fff",
                             borderRadius: "5px",
                             textDecoration: "none",
                             fontWeight: "bold",
@@ -559,6 +579,36 @@ const CreditCardDropdown = () => {
           </div>
         )}
       </div>
+
+      {/* Scroll Down Button */}
+      {showScrollButton && (
+        <button 
+          onClick={handleScrollDown}
+          style={{
+            position: 'fixed',
+            right: '20px',
+            bottom: '20px',
+            padding: window.innerWidth > 768 ? '10px 15px' : '8px 12px',
+            backgroundColor: '#4CAF50',
+            color: 'white',
+            border: 'none',
+            borderRadius: window.innerWidth > 768 ? '5px' : '50%',
+            cursor: 'pointer',
+            fontSize: window.innerWidth > 768 ? '16px' : '24px',
+            zIndex: 1000,
+            boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
+            width: window.innerWidth > 768 ? 'auto' : '50px',
+            height: window.innerWidth > 768 ? 'auto' : '50px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.3s ease'
+          }}
+          aria-label="Scroll down"
+        >
+          {window.innerWidth > 768 ? 'Scroll Down' : '↓'}
+        </button>
+      )}
     </div>
   );
 };
