@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import Papa from "papaparse";
 import "./App.css";
@@ -14,19 +14,83 @@ const CreditCardDropdown = () => {
   const [bookMyShowOffers, setBookMyShowOffers] = useState([]);
   const [movieDebitOffers, setMovieDebitOffers] = useState([]);
   const [movieBenefits, setMovieBenefits] = useState([]);
-  const [expandedOfferIndex, setExpandedOfferIndex] = useState({ 
-    pvr: null, 
-    inox: null, 
-    bms: null 
-  });
+  const [expandedOfferIndex, setExpandedOfferIndex] = useState({ pvr: null, inox: null, bms: null });
   const [showNoCardMessage, setShowNoCardMessage] = useState(false);
   const [typingTimeout, setTypingTimeout] = useState(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+
+    const [isMobile, setIsMobile] = useState(false);
+
+  // Add this useEffect for mobile detection
+  useEffect(() => {
+    const checkIfMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    // Initial check
+    checkIfMobile();
+    
+    // Add resize listener
+    window.addEventListener('resize', checkIfMobile);
+    
+    // Cleanup
+    return () => window.removeEventListener('resize', checkIfMobile);
+  }, []);
+
+  const getOffersForSelectedCard = (offers, isDebit = false) => {
+    return offers.filter((offer) => {
+      if (isDebit) {
+        return (
+          offer["Applicable Debit Cards"] &&
+          offer["Applicable Debit Cards"].split(",").map((c) => c.trim()).includes(selectedCard)
+        );
+      } else {
+        return offer["Credit Card"] && offer["Credit Card"].trim() === selectedCard;
+      }
+    });
+  };
+
+  const getMovieBenefitsForSelectedCard = () => {
+    return movieBenefits.filter((offer) => {
+      const cardName = offer["Credit Card Name"] ? offer["Credit Card Name"].trim() : "";
+      return cardName.toLowerCase() === selectedCard.toLowerCase();
+    });
+  };
+
+  const selectedPvrOffers = getOffersForSelectedCard(pvrOffers);
+  const selectedInoxOffers = getOffersForSelectedCard(inoxOffers);
+  const selectedBookMyShowOffers = getOffersForSelectedCard(bookMyShowOffers);
+  const selectedMovieDebitOffers = getOffersForSelectedCard(movieDebitOffers, true);
+  const selectedMovieBenefits = getMovieBenefitsForSelectedCard();
 
   const toggleOfferDetails = (type, index) => {
-    setExpandedOfferIndex(prev => ({
+    setExpandedOfferIndex((prev) => ({
       ...prev,
-      [type]: prev[type] === index ? null : index
+      [type]: prev[type] === index ? null : index,
     }));
+  };
+
+  const hasAnyOffers = useCallback(() => {
+    return (
+      selectedPvrOffers.length > 0 ||
+      selectedInoxOffers.length > 0 ||
+      selectedBookMyShowOffers.length > 0 ||
+      selectedMovieDebitOffers.length > 0 ||
+      selectedMovieBenefits.length > 0
+    );
+  }, [
+    selectedPvrOffers,
+    selectedInoxOffers,
+    selectedBookMyShowOffers,
+    selectedMovieDebitOffers,
+    selectedMovieBenefits,
+  ]);
+
+  const handleScrollDown = () => {
+    window.scrollTo({
+      top: document.documentElement.scrollHeight,
+      behavior: "smooth"
+    });
   };
 
   useEffect(() => {
@@ -37,7 +101,7 @@ const CreditCardDropdown = () => {
           axios.get("/Inox final.csv"),
           axios.get("/Book My Show final.csv"),
           axios.get("/Final_Cleaned_Movie_Offers.csv"),
-          axios.get("/Final_Movie_Benefits_List_With_Images.csv")
+          axios.get("/Final_Movie_Benefits_List_With_Images.csv"),
         ]);
 
         const pvrData = Papa.parse(pvrResponse.data, { header: true });
@@ -53,27 +117,14 @@ const CreditCardDropdown = () => {
         setMovieBenefits(benefitsData.data);
 
         const benefitsCreditCards = new Set();
-        benefitsData.data.forEach(row => {
+        benefitsData.data.forEach((row) => {
           if (row["Credit Card Name"]) {
             benefitsCreditCards.add(row["Credit Card Name"].trim());
           }
         });
 
         const otherCreditCards = new Set();
-        
-        pvrData.data.forEach(row => {
-          if (row["Credit Card"]) {
-            otherCreditCards.add(row["Credit Card"].trim());
-          }
-        });
-        
-        inoxData.data.forEach(row => {
-          if (row["Credit Card"]) {
-            otherCreditCards.add(row["Credit Card"].trim());
-          }
-        });
-        
-        bmsData.data.forEach(row => {
+        [...pvrData.data, ...inoxData.data, ...bmsData.data].forEach((row) => {
           if (row["Credit Card"]) {
             otherCreditCards.add(row["Credit Card"].trim());
           }
@@ -82,9 +133,9 @@ const CreditCardDropdown = () => {
         const allCreditCards = new Set([...benefitsCreditCards, ...otherCreditCards]);
 
         const allDebitCards = new Set();
-        debitData.data.forEach(row => {
+        debitData.data.forEach((row) => {
           if (row["Applicable Debit Cards"]) {
-            row["Applicable Debit Cards"].split(",").forEach(card => {
+            row["Applicable Debit Cards"].split(",").forEach((card) => {
               allDebitCards.add(card.trim());
             });
           }
@@ -100,14 +151,16 @@ const CreditCardDropdown = () => {
     fetchCSVData();
   }, []);
 
+  useEffect(() => {
+    setShowScrollButton(selectedCard && hasAnyOffers());
+  }, [selectedCard, hasAnyOffers]);
+
   const handleInputChange = (event) => {
     const value = event.target.value;
     setQuery(value);
     setShowNoCardMessage(false);
 
-    if (typingTimeout) {
-      clearTimeout(typingTimeout);
-    }
+    if (typingTimeout) clearTimeout(typingTimeout);
 
     if (!value) {
       setSelectedCard("");
@@ -115,16 +168,16 @@ const CreditCardDropdown = () => {
       return;
     }
 
-    const queryWords = value.toLowerCase().split(/\s+/).filter(word => word.length > 0);
-    
+    const queryWords = value.toLowerCase().split(/\s+/).filter((word) => word.length > 0);
+
     const filteredCredit = creditCards.filter((card) => {
       const cardLower = card.toLowerCase();
-      return queryWords.every(word => cardLower.includes(word));
+      return queryWords.every((word) => cardLower.includes(word));
     });
-    
+
     const filteredDebit = debitCards.filter((card) => {
       const cardLower = card.toLowerCase();
-      return queryWords.every(word => cardLower.includes(word));
+      return queryWords.every((word) => cardLower.includes(word));
     });
 
     const combinedResults = [];
@@ -153,45 +206,8 @@ const CreditCardDropdown = () => {
     setFilteredCards([]);
     setExpandedOfferIndex({ pvr: null, inox: null, bms: null });
     setShowNoCardMessage(false);
-    if (typingTimeout) {
-      clearTimeout(typingTimeout);
-    }
-  };
-
-  const getOffersForSelectedCard = (offers, isDebit = false) => {
-    return offers.filter((offer) => {
-      if (isDebit) {
-        return (
-          offer["Applicable Debit Cards"] &&
-          offer["Applicable Debit Cards"].split(",").map((c) => c.trim()).includes(selectedCard)
-        );
-      } else {
-        return offer["Credit Card"] && offer["Credit Card"].trim() === selectedCard;
-      }
-    });
-  };
-
-  const getMovieBenefitsForSelectedCard = () => {
-    return movieBenefits.filter(offer => {
-      const cardName = offer["Credit Card Name"] ? offer["Credit Card Name"].trim() : "";
-      return cardName.toLowerCase() === selectedCard.toLowerCase();
-    });
-  };
-
-  const selectedPvrOffers = getOffersForSelectedCard(pvrOffers);
-  const selectedInoxOffers = getOffersForSelectedCard(inoxOffers);
-  const selectedBookMyShowOffers = getOffersForSelectedCard(bookMyShowOffers);
-  const selectedMovieDebitOffers = getOffersForSelectedCard(movieDebitOffers, true);
-  const selectedMovieBenefits = getMovieBenefitsForSelectedCard();
-
-  const hasAnyOffers = () => {
-    return (
-      selectedPvrOffers.length > 0 ||
-      selectedInoxOffers.length > 0 ||
-      selectedBookMyShowOffers.length > 0 ||
-      selectedMovieDebitOffers.length > 0 ||
-      selectedMovieBenefits.length > 0
-    );
+    if (typingTimeout) clearTimeout(typingTimeout);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
@@ -259,6 +275,49 @@ const CreditCardDropdown = () => {
           )}
         </div>
 
+        {showScrollButton && (
+
+        <button 
+          onClick={handleScrollDown}
+          style={{
+            position: "fixed",
+            bottom: "350px",
+            right: "20px",
+            padding: isMobile ? "12px" : "10px 15px",
+            backgroundColor: "#39641D",
+            color: "white",
+            border: "none",
+            borderRadius: "5px",
+            cursor: "pointer",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: isMobile ? "40px" : "auto",
+            height: isMobile ? "40px" : "auto"
+          }}
+          aria-label="Scroll down"
+        >
+          {isMobile ? (
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              width="24" 
+              height="24" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="white" 
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+          ) : (
+            <span>Scroll Down</span>
+          )}
+        </button>
+        )}
+
         {showNoCardMessage && (
           <div style={{
             textAlign: "center",
@@ -286,10 +345,10 @@ const CreditCardDropdown = () => {
           <div className="offer-section">
             {selectedMovieBenefits.length > 0 && (
               <div className="offer-container">
-                <h2 style={{ textAlign: "center", margin: "20px 0" }}>Permanent Offers on {selectedCard}</h2>
+                <h2 style={{  margin: "20px 0" }}>Permanent Offers</h2>
                 <div className="offer-row">
                   {selectedMovieBenefits.map((benefit, index) => (
-                    <div key={`benefit-${index}`} className="offer-card" style={{backgroundColor: "#39641D", color: "white"}}>
+                    <div key={`benefit-${index}`} className="offer-card" style={{backgroundColor: "#f5f5f5", color: "black"}}>
                       {benefit.image && (
                         <img 
                           src={benefit.image} 
@@ -444,7 +503,7 @@ const CreditCardDropdown = () => {
                       style={{
                         backgroundColor: "#f5f5f5", 
                         color: "black",
-                        height: expandedOfferIndex.bms === index ? 'auto' : '400px',
+                        height: 'auto',
                         overflow: 'hidden'
                       }}
                     >
@@ -515,7 +574,7 @@ const CreditCardDropdown = () => {
                     <div 
                       key={`debit-${index}`} 
                       className="offer-card" 
-                      style={{ backgroundColor: "#39641D", color: "white" }}
+                      style={{ backgroundColor: "#f5f5f5", color: "black" }}
                     >
                       {offer.Image && (
                         <img 
@@ -540,8 +599,8 @@ const CreditCardDropdown = () => {
                           style={{
                             display: "inline-block",
                             padding: "10px 20px",
-                            backgroundColor: "white",
-                            color: "#39641D",
+                            backgroundColor: "#39641D",
+                            color: "white",
                             borderRadius: "5px",
                             textDecoration: "none",
                             fontWeight: "bold",
