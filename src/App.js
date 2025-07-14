@@ -246,6 +246,11 @@ const CreditCardDropdown = () => {
       return;
     }
 
+    // Clear selected card when user starts typing a new query
+    if (selectedCard && value !== selectedCard) {
+      setSelectedCard("");
+    }
+
     // Filter and sort by match quality
     const scoredCards = creditCards.map(card => ({
       card,
