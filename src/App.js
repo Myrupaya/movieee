@@ -5,37 +5,34 @@ import "./App.css";
 
 const CreditCardDropdown = () => {
   const [creditCards, setCreditCards] = useState([]);
-  const [debitCards, setDebitCards] = useState([]);
+  // const [debitCards, setDebitCards] = useState([]);
   const [filteredCards, setFilteredCards] = useState([]);
   const [query, setQuery] = useState("");
   const [selectedCard, setSelectedCard] = useState("");
   const [pvrOffers, setPvrOffers] = useState([]);
-  const [inoxOffers, setInoxOffers] = useState([]);
   const [bookMyShowOffers, setBookMyShowOffers] = useState([]);
-  const [movieDebitOffers, setMovieDebitOffers] = useState([]);
+  const [paytmDistrictOffers, setPaytmDistrictOffers] = useState([]);
   const [movieBenefits, setMovieBenefits] = useState([]);
-  const [expandedOfferIndex, setExpandedOfferIndex] = useState({ pvr: null, inox: null, bms: null });
+  const [expandedOfferIndex, setExpandedOfferIndex] = useState({ pvr: null, bms: null, paytm: null });
   const [showNoCardMessage, setShowNoCardMessage] = useState(false);
   const [typingTimeout, setTypingTimeout] = useState(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
-    const [isMobile, setIsMobile] = useState(false);
-
-  // Add this useEffect for mobile detection
   useEffect(() => {
     const checkIfMobile = () => {
       setIsMobile(window.innerWidth <= 768);
     };
-    
-    // Initial check
     checkIfMobile();
-    
-    // Add resize listener
     window.addEventListener('resize', checkIfMobile);
-    
-    // Cleanup
     return () => window.removeEventListener('resize', checkIfMobile);
   }, []);
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      alert("Promo code copied: " + text);
+    });
+  };
 
   const getOffersForSelectedCard = (offers, isDebit = false) => {
     return offers.filter((offer) => {
@@ -58,9 +55,8 @@ const CreditCardDropdown = () => {
   };
 
   const selectedPvrOffers = getOffersForSelectedCard(pvrOffers);
-  const selectedInoxOffers = getOffersForSelectedCard(inoxOffers);
   const selectedBookMyShowOffers = getOffersForSelectedCard(bookMyShowOffers);
-  const selectedMovieDebitOffers = getOffersForSelectedCard(movieDebitOffers, true);
+  const selectedPaytmDistrictOffers = getOffersForSelectedCard(paytmDistrictOffers);
   const selectedMovieBenefits = getMovieBenefitsForSelectedCard();
 
   const toggleOfferDetails = (type, index) => {
@@ -73,16 +69,14 @@ const CreditCardDropdown = () => {
   const hasAnyOffers = useCallback(() => {
     return (
       selectedPvrOffers.length > 0 ||
-      selectedInoxOffers.length > 0 ||
       selectedBookMyShowOffers.length > 0 ||
-      selectedMovieDebitOffers.length > 0 ||
+      selectedPaytmDistrictOffers.length > 0 ||
       selectedMovieBenefits.length > 0
     );
   }, [
     selectedPvrOffers,
-    selectedInoxOffers,
     selectedBookMyShowOffers,
-    selectedMovieDebitOffers,
+    selectedPaytmDistrictOffers,
     selectedMovieBenefits,
   ]);
 
@@ -96,53 +90,44 @@ const CreditCardDropdown = () => {
   useEffect(() => {
     const fetchCSVData = async () => {
       try {
-        const [pvrResponse, inoxResponse, bmsResponse, debitResponse, benefitsResponse] = await Promise.all([
-          axios.get("/Pvr final.csv"),
-          axios.get("/Inox final.csv"),
-          axios.get("/Book My Show final.csv"),
-          axios.get("/Final_Cleaned_Movie_Offers.csv"),
+        const [pvrResponse, bmsResponse, paytmResponse, benefitsResponse] = await Promise.all([
+          axios.get("/PVR.csv"),
+          axios.get("/Bookmyshow.csv"),
+          axios.get("/Paytm and District.csv"),
           axios.get("/Final_Movie_Benefits_List_With_Images.csv"),
         ]);
 
         const pvrData = Papa.parse(pvrResponse.data, { header: true });
-        const inoxData = Papa.parse(inoxResponse.data, { header: true });
         const bmsData = Papa.parse(bmsResponse.data, { header: true });
-        const debitData = Papa.parse(debitResponse.data, { header: true });
+        const paytmData = Papa.parse(paytmResponse.data, { header: true });
         const benefitsData = Papa.parse(benefitsResponse.data, { header: true });
 
         setPvrOffers(pvrData.data);
-        setInoxOffers(inoxData.data);
         setBookMyShowOffers(bmsData.data);
-        setMovieDebitOffers(debitData.data);
+        setPaytmDistrictOffers(paytmData.data);
         setMovieBenefits(benefitsData.data);
 
-        const benefitsCreditCards = new Set();
-        benefitsData.data.forEach((row) => {
-          if (row["Credit Card Name"]) {
-            benefitsCreditCards.add(row["Credit Card Name"].trim());
-          }
+        const allCreditCards = new Set();
+        
+        // Extract credit cards from all files
+        pvrData.data.forEach(row => {
+          if (row["Credit Card Name"]) allCreditCards.add(row["Credit Card Name"].trim());
         });
-
-        const otherCreditCards = new Set();
-        [...pvrData.data, ...inoxData.data, ...bmsData.data].forEach((row) => {
-          if (row["Credit Card"]) {
-            otherCreditCards.add(row["Credit Card"].trim());
-          }
+        
+        bmsData.data.forEach(row => {
+          if (row["Credit Card Name"]) allCreditCards.add(row["Credit Card Name"].trim());
         });
-
-        const allCreditCards = new Set([...benefitsCreditCards, ...otherCreditCards]);
-
-        const allDebitCards = new Set();
-        debitData.data.forEach((row) => {
-          if (row["Applicable Debit Cards"]) {
-            row["Applicable Debit Cards"].split(",").forEach((card) => {
-              allDebitCards.add(card.trim());
-            });
-          }
+        
+        paytmData.data.forEach(row => {
+          if (row["Credit Card Name"]) allCreditCards.add(row["Credit Card Name"].trim());
+        });
+        
+        benefitsData.data.forEach(row => {
+          if (row["Credit Card Name"]) allCreditCards.add(row["Credit Card Name"].trim());
         });
 
         setCreditCards(Array.from(allCreditCards).sort());
-        setDebitCards(Array.from(allDebitCards).sort());
+        // setDebitCards([]); // No debit cards in these files
       } catch (error) {
         console.error("Error loading CSV data:", error);
       }
@@ -168,26 +153,16 @@ const CreditCardDropdown = () => {
       return;
     }
 
-    const queryWords = value.toLowerCase().split(/\s+/).filter((word) => word.length > 0);
+    const queryWords = value.toLowerCase().split(/\s+/).filter(word => word.length > 0);
 
-    const filteredCredit = creditCards.filter((card) => {
-      const cardLower = card.toLowerCase();
-      return queryWords.every((word) => cardLower.includes(word));
-    });
-
-    const filteredDebit = debitCards.filter((card) => {
-      const cardLower = card.toLowerCase();
-      return queryWords.every((word) => cardLower.includes(word));
-    });
+    const filteredCredit = creditCards.filter(card => 
+      queryWords.every(word => card.toLowerCase().includes(word))
+    );
 
     const combinedResults = [];
     if (filteredCredit.length > 0) {
       combinedResults.push({ type: "heading", label: "Credit Cards" });
-      combinedResults.push(...filteredCredit.map((card) => ({ type: "credit", card })));
-    }
-    if (filteredDebit.length > 0) {
-      combinedResults.push({ type: "heading", label: "Debit Cards" });
-      combinedResults.push(...filteredDebit.map((card) => ({ type: "debit", card })));
+      combinedResults.push(...filteredCredit.map(card => ({ type: "credit", card })));
     }
 
     setFilteredCards(combinedResults);
@@ -204,7 +179,7 @@ const CreditCardDropdown = () => {
     setSelectedCard(card);
     setQuery(card);
     setFilteredCards([]);
-    setExpandedOfferIndex({ pvr: null, inox: null, bms: null });
+    setExpandedOfferIndex({ pvr: null, bms: null, paytm: null });
     setShowNoCardMessage(false);
     if (typingTimeout) clearTimeout(typingTimeout);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -255,17 +230,10 @@ const CreditCardDropdown = () => {
                     style={{
                       padding: "10px",
                       cursor: "pointer",
-                      borderBottom:
-                        index !== filteredCards.length - 1
-                          ? "1px solid #eee"
-                          : "none",
+                      borderBottom: index !== filteredCards.length - 1 ? "1px solid #eee" : "none",
                     }}
-                    onMouseOver={(e) =>
-                      (e.target.style.backgroundColor = "#f0f0f0")
-                    }
-                    onMouseOut={(e) =>
-                      (e.target.style.backgroundColor = "transparent")
-                    }
+                    onMouseOver={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
+                    onMouseOut={(e) => (e.target.style.backgroundColor = "transparent")}
                   >
                     {item.card}
                   </li>
@@ -276,67 +244,45 @@ const CreditCardDropdown = () => {
         </div>
 
         {showScrollButton && (
-
-        <button 
-          onClick={handleScrollDown}
-          style={{
-            position: "fixed",
-            bottom: "350px",
-            right: "20px",
-            padding: isMobile ? "12px" : "10px 15px",
-            backgroundColor: "#39641D",
-            color: "white",
-            border: "none",
-            borderRadius: "5px",
-            cursor: "pointer",
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: isMobile ? "40px" : "auto",
-            height: isMobile ? "40px" : "auto"
-          }}
-          aria-label="Scroll down"
-        >
-          {isMobile ? (
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              width="24" 
-              height="24" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="white" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            >
-              <path d="M6 9l6 6 6-6"/>
-            </svg>
-          ) : (
-            <span>Scroll Down</span>
-          )}
-        </button>
+          <button 
+            onClick={handleScrollDown}
+            style={{
+              position: "fixed",
+              bottom: "350px",
+              right: "20px",
+              padding: isMobile ? "12px" : "10px 15px",
+              backgroundColor: "#39641D",
+              color: "white",
+              border: "none",
+              borderRadius: "5px",
+              cursor: "pointer",
+              zIndex: 1000,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: isMobile ? "40px" : "auto",
+              height: isMobile ? "40px" : "auto"
+            }}
+            aria-label="Scroll down"
+          >
+            {isMobile ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
+            ) : (
+              <span>Scroll Down</span>
+            )}
+          </button>
         )}
 
         {showNoCardMessage && (
-          <div style={{
-            textAlign: "center",
-            margin: "40px 0",
-            fontSize: "20px",
-            color: "red",
-            fontWeight: "bold"
-          }}>
+          <div style={{ textAlign: "center", margin: "40px 0", fontSize: "20px", color: "red", fontWeight: "bold" }}>
             No offers for this card
           </div>
         )}
 
         {selectedCard && !hasAnyOffers() && !showNoCardMessage && (
-          <div style={{
-            textAlign: "center",
-            margin: "40px 0",
-            fontSize: "20px",
-            color: "#666"
-          }}>
+          <div style={{ textAlign: "center", margin: "40px 0", fontSize: "20px", color: "#666" }}>
             No offers found for {selectedCard}
           </div>
         )}
@@ -345,7 +291,7 @@ const CreditCardDropdown = () => {
           <div className="offer-section">
             {selectedMovieBenefits.length > 0 && (
               <div className="offer-container">
-                <h2 style={{  margin: "20px 0" }}>Permanent Offers</h2>
+                <h2 style={{ margin: "20px 0" }}>Permanent Offers</h2>
                 <div className="offer-row">
                   {selectedMovieBenefits.map((benefit, index) => (
                     <div key={`benefit-${index}`} className="offer-card" style={{backgroundColor: "#f5f5f5", color: "black"}}>
@@ -361,17 +307,9 @@ const CreditCardDropdown = () => {
                           }}
                         />
                       )}
-                      <h3>{benefit["Credit Card Name"] || "Card Offer"}</h3>
+                      
                       {benefit["Movie Benefit"] && <p><strong>Benefit:</strong> {benefit["Movie Benefit"]}</p>}
-                      {benefit.Terms && <p><strong>Terms:</strong> {benefit.Terms}</p>}
-                      {benefit.Link && (
-                        <button 
-                          onClick={() => window.open(benefit.Link, "_blank")}
-                          className="view-details-btn"
-                        >
-                          View Details
-                        </button>
-                      )}
+                      
                     </div>
                   ))}
                 </div>
@@ -380,7 +318,7 @@ const CreditCardDropdown = () => {
 
             {selectedPvrOffers.length > 0 && (
               <div className="offer-container">
-                <h2>PVR Offers</h2>
+                <h2>Offers on PVR</h2>
                 <div className="offer-row">
                   {selectedPvrOffers.map((offer, index) => (
                     <div 
@@ -395,8 +333,8 @@ const CreditCardDropdown = () => {
                     >
                       {offer.Image && (
                         <img 
-                          src={offer.Image} 
-                          alt={offer.Title || "PVR Offer"} 
+                          src={offer["Image URL"]} 
+                          alt={offer["Offer Title"] || "PVR Offer"} 
                           style={{ 
                             maxWidth: "100%", 
                             height: "auto",
@@ -405,20 +343,19 @@ const CreditCardDropdown = () => {
                           }} 
                         />
                       )}
-                      <h3>{offer.Title || "PVR Offer"}</h3>
-                      {offer.Validity && <p><strong>Validity:</strong> {offer.Validity}</p>}
+                      <h3>{offer["Offer Title"] || "PVR Offer"}</h3>
+                      {offer.Validity && <p><strong>Validity:</strong> {offer["Validity Date"]}</p>}
+                      {offer["Coupn Code"] && (
+                        <p>
+                          <span role="img" aria-label="important" style={{ marginRight: "5px" }}>⚠️</span>
+                          <strong>Important:</strong> {offer["Coupn Code"]}
+                        </p>
+                      )}
                       
                       {expandedOfferIndex.pvr === index && (
-                        <div className="terms-container" style={{ 
-                          maxHeight: '200px',
-                          overflowY: 'auto',
-                          padding: '10px',
-                          backgroundColor: 'rgba(0,0,0,0.1)',
-                          borderRadius: '5px',
-                          marginTop: '10px'
-                        }}>
-                          <h4>Offer Details:</h4>
-                          <p>{offer.Offers}</p>
+                        <div className="terms-container">
+                          <h4>Terms and Conditions:</h4>
+                          <p>{offer["Terms and Conditions"]}</p>
                         </div>
                       )}
                       
@@ -427,64 +364,7 @@ const CreditCardDropdown = () => {
                         className={`details-btn ${expandedOfferIndex.pvr === index ? "active" : ""}`}
                         style={{ marginTop: '10px' }}
                       >
-                        {expandedOfferIndex.pvr === index ? "Hide Details" : "Click For More Details"}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {selectedInoxOffers.length > 0 && (
-              <div className="offer-container">
-                <h2>INOX Offers</h2>
-                <div className="offer-row">
-                  {selectedInoxOffers.map((offer, index) => (
-                    <div 
-                      key={`inox-${index}`} 
-                      className={`offer-card ${expandedOfferIndex.inox === index ? 'expanded' : ''}`}
-                      style={{
-                        backgroundColor: "#f5f5f5", 
-                        color: "black",
-                        height: expandedOfferIndex.inox === index ? 'auto' : '400px',
-                        overflow: 'hidden'
-                      }}
-                    >
-                      {offer.Image && (
-                        <img 
-                          src={offer.Image} 
-                          alt={offer.Title || "INOX Offer"} 
-                          style={{ 
-                            maxWidth: "100%", 
-                            height: "auto",
-                            maxHeight: "150px",
-                            objectFit: "contain"
-                          }} 
-                        />
-                      )}
-                      <h3>{offer.Title || "INOX Offer"}</h3>
-                      {offer.Validity && <p><strong>Validity:</strong> {offer.Validity}</p>}
-                      
-                      {expandedOfferIndex.inox === index && (
-                        <div className="terms-container" style={{ 
-                          maxHeight: '200px',
-                          overflowY: 'auto',
-                          padding: '10px',
-                          backgroundColor: 'rgba(0,0,0,0.1)',
-                          borderRadius: '5px',
-                          marginTop: '10px'
-                        }}>
-                          <h4>Offer Details:</h4>
-                          <p>{offer.Offers}</p>
-                        </div>
-                      )}
-                      
-                      <button 
-                        onClick={() => toggleOfferDetails("inox", index)}
-                        className={`details-btn ${expandedOfferIndex.inox === index ? "active" : ""}`}
-                        style={{ marginTop: '10px' }}
-                      >
-                        {expandedOfferIndex.inox === index ? "Hide Details" : "Click For More Details"}
+                        {expandedOfferIndex.pvr === index ? "Hide Details" : "Show Terms & Conditions"}
                       </button>
                     </div>
                   ))}
@@ -494,23 +374,18 @@ const CreditCardDropdown = () => {
 
             {selectedBookMyShowOffers.length > 0 && (
               <div className="offer-container">
-                <h2>BookMyShow Offers</h2>
+                <h2>Offers on BookMyShow</h2>
                 <div className="offer-row">
                   {selectedBookMyShowOffers.map((offer, index) => (
                     <div 
                       key={`bms-${index}`} 
-                      className={`offer-card ${expandedOfferIndex.bms === index ? 'expanded' : ''}`}
-                      style={{
-                        backgroundColor: "#f5f5f5", 
-                        color: "black",
-                        height: 'auto',
-                        overflow: 'hidden'
-                      }}
+                      className="offer-card"
+                      style={{ backgroundColor: "#f5f5f5", color: "black" }}
                     >
                       {offer.Image && (
                         <img 
-                          src={offer.Image} 
-                          alt={offer.Title || "BookMyShow Offer"} 
+                          src={offer["Offer Image Link"]} 
+                          alt={"BookMyShow Offer"} 
                           style={{ 
                             maxWidth: "100%", 
                             height: "auto",
@@ -519,27 +394,13 @@ const CreditCardDropdown = () => {
                           }} 
                         />
                       )}
-                      <h3>{offer.Title || "BookMyShow Offer"}</h3>
-                      {offer.Offer && <p><strong>Offer:</strong> {offer.Offer}</p>}
-                      {offer.Validity && <p><strong>Validity:</strong> {offer.Validity}</p>}
+            
+                      {offer["Offer Description"] && <p><strong>Description:</strong> {offer["Offer Description"]}</p>}
+                      {offer.Validity && <p><strong>Validity:</strong> {offer["Validity of Offer"]}</p>}
                       
-                      {expandedOfferIndex.bms === index && (
-                        <div className="terms-container" style={{ 
-                          maxHeight: '200px',
-                          overflowY: 'auto',
-                          padding: '10px',
-                          backgroundColor: 'rgba(0,0,0,0.1)',
-                          borderRadius: '5px',
-                          marginTop: '10px'
-                        }}>
-                          <h4>Offer Details:</h4>
-                          <p>{offer.Offers || "No additional details available"}</p>
-                        </div>
-                      )}
-                      
-                      {offer.Link ? (
+                      {offer["Offer Link"] && (
                         <a 
-                          href={offer.Link} 
+                          href={offer["Offer Link"]} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           style={{ textDecoration: "none" }}
@@ -548,17 +409,9 @@ const CreditCardDropdown = () => {
                             className="view-details-btn"
                             style={{ marginTop: '10px', cursor: 'pointer' }}
                           >
-                            View Details
+                            Click for more details
                           </button>
                         </a>
-                      ) : (
-                        <button 
-                          onClick={() => toggleOfferDetails("bms", index)}
-                          className={`details-btn ${expandedOfferIndex.bms === index ? "active" : ""}`}
-                          style={{ marginTop: '10px' }}
-                        >
-                          {expandedOfferIndex.bms === index ? "Hide Details" : "Click For More Details"}
-                        </button>
                       )}
                     </div>
                   ))}
@@ -566,20 +419,25 @@ const CreditCardDropdown = () => {
               </div>
             )}
 
-            {selectedMovieDebitOffers.length > 0 && (
+            {selectedPaytmDistrictOffers.length > 0 && (
               <div className="offer-container">
-                <h2>Debit Card Offers</h2>
+                <h2>Offers on Paytm and District</h2>
                 <div className="offer-row">
-                  {selectedMovieDebitOffers.map((offer, index) => (
+                  {selectedPaytmDistrictOffers.map((offer, index) => (
                     <div 
-                      key={`debit-${index}`} 
-                      className="offer-card" 
-                      style={{ backgroundColor: "#f5f5f5", color: "black" }}
+                      key={`paytm-${index}`} 
+                      className={`offer-card ${expandedOfferIndex.paytm === index ? 'expanded' : ''}`}
+                      style={{
+                        backgroundColor: "#f5f5f5", 
+                        color: "black",
+                        height: expandedOfferIndex.paytm === index ? 'auto' : '400px',
+                        overflow: 'hidden'
+                      }}
                     >
                       {offer.Image && (
                         <img 
-                          src={offer.Image} 
-                          alt={offer.Website || "Debit Card Offer"} 
+                          src={offer["Offer Image Link"]} 
+                          alt={"Paytm & District Offer"} 
                           style={{ 
                             maxWidth: "100%", 
                             height: "auto",
@@ -588,28 +446,51 @@ const CreditCardDropdown = () => {
                           }} 
                         />
                       )}
-                      <h3>{offer.Website || "Debit Card Offer"}</h3>
-                      {offer.Offer && <p>{offer.Offer}</p>}
-                      {offer.Link && (
-                        <a 
-                          href={offer.Link} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="view-details-btn"
-                          style={{
-                            display: "inline-block",
-                            padding: "10px 20px",
-                            backgroundColor: "#39641D",
-                            color: "white",
-                            borderRadius: "5px",
-                            textDecoration: "none",
-                            fontWeight: "bold",
-                            marginTop: "10px"
-                          }}
-                        >
-                          View Details
-                        </a>
+                      <h3>{offer["Offer title"] || "Paytm & District Offer"}</h3>
+                      {offer["Offer description"] && <p><strong>Description:</strong> {offer["Offer description"]}</p>}
+                      
+                      {offer["Promo code"] && (
+                        <div style={{ display: 'flex', alignItems: 'center', margin: '10px 0' }}>
+                          <strong>Promo Code: </strong>
+                          <span style={{ 
+                            padding: '5px 10px', 
+                            backgroundColor: '#e9e9e9', 
+                            borderRadius: '4px',
+                            margin: '0 10px',
+                            fontFamily: 'monospace'
+                          }}>
+                            {offer["Promo code"]}
+                          </span>
+                          <button 
+                            onClick={() => copyToClipboard(offer["Promo code"])}
+                            style={{
+                              padding: '5px 10px',
+                              backgroundColor: '#39641D',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Copy
+                          </button>
+                        </div>
                       )}
+                      
+                      {expandedOfferIndex.paytm === index && (
+                        <div className="terms-container">
+                          <h4>Terms and Conditions:</h4>
+                          <p>{offer["Offer details"]}</p>
+                        </div>
+                      )}
+                      
+                      <button 
+                        onClick={() => toggleOfferDetails("paytm", index)}
+                        className={`details-btn ${expandedOfferIndex.paytm === index ? "active" : ""}`}
+                        style={{ marginTop: '10px' }}
+                      >
+                        {expandedOfferIndex.paytm === index ? "Hide Details" : "Show Terms & Conditions"}
+                      </button>
                     </div>
                   ))}
                 </div>
