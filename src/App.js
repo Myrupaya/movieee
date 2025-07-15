@@ -378,7 +378,7 @@ const CreditCardDropdown = () => {
               bottom: "350px",
               right: "20px",
               padding: isMobile ? "12px" : "10px 15px",
-              backgroundColor: "#39641D",
+              backgroundColor: "#1e7145",
               color: "white",
               border: "none",
               borderRadius: "5px",
@@ -436,6 +436,7 @@ const CreditCardDropdown = () => {
                       )}
                       
                       {benefit["Movie Benefit"] && <p><strong>Benefit:</strong> {benefit["Movie Benefit"]}</p>}
+                      <p> <strong> This is a inbuilt feature of this credit card </strong></p>
                       
                     </div>
                   ))}

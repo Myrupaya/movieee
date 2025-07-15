@@ -180,18 +180,13 @@ button, .view-details-btn {
   display: inline-block;
 }
 
-button:hover, .view-details-btn:hover {
-  background-color: #2a4e16;
-}
+
 
 .details-btn {
-  background-color: #39641D;
+  background-color: #1e7145;
   color: white;
 }
 
-.details-btn.active {
-  background-color: #2a4e16;
-}
 
 /* Special Card Styles */
 .offer-card[style*="#39641D"] {
