@@ -68,7 +68,6 @@ const CreditCardDropdown = () => {
   const [typingTimeout, setTypingTimeout] = useState(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // NEW: Loading state
 
   useEffect(() => {
     const checkIfMobile = () => {
@@ -186,8 +185,6 @@ const CreditCardDropdown = () => {
   useEffect(() => {
     const fetchCSVData = async () => {
       try {
-        setIsLoading(true); // NEW: Show loading when starting
-        
         // Fetch all CSV files including the new "All Cards.csv"
         const [pvrResponse, bmsResponse, paytmResponse, benefitsResponse, allCardsResponse] = await Promise.all([
           axios.get("/PVR.csv"),
@@ -233,12 +230,8 @@ const CreditCardDropdown = () => {
         });
 
         setCreditCards(Array.from(allCreditCards).sort());
-        
-        // NEW: Hide loading after data is processed
-        setIsLoading(false);
       } catch (error) {
         console.error("Error loading CSV data:", error);
-        setIsLoading(false); // NEW: Hide loading on error too
       }
     };
 
@@ -305,16 +298,6 @@ const CreditCardDropdown = () => {
     if (typingTimeout) clearTimeout(typingTimeout);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-
-  // NEW: Loading overlay component
-  if (isLoading) {
-    return (
-      <div className="loading-overlay">
-        <div className="loading-spinner"></div>
-        <p>Loading credit card offers...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="App">
