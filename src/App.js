@@ -3,6 +3,15 @@ import axios from "axios";
 import Papa from "papaparse";
 import "./App.css";
 
+// Helper function to normalize card names
+const normalizeCardName = (name) => {
+  if (!name) return '';
+  return name.trim()
+    .toLowerCase()
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .replace(/\s+/g, ' ');
+};
+
 // Fuzzy matching utility functions
 const levenshteinDistance = (a, b) => {
   if (!a || !b) return 100;
@@ -86,29 +95,30 @@ const CreditCardDropdown = () => {
 
   // Enhanced matching for network-specific cards
   const getOffersForSelectedCard = (offers) => {
+    const normalizedSelected = normalizeCardName(selectedCard);
     return offers.filter((offer) => {
-      const offerCardName = offer["Credit Card Name"] ? offer["Credit Card Name"].trim() : "";
+      const offerCardName = offer["Credit Card Name"] ? normalizeCardName(offer["Credit Card Name"]) : "";
       
       // Direct match
-      if (offerCardName.toLowerCase() === selectedCard.toLowerCase()) {
+      if (offerCardName === normalizedSelected) {
         return true;
       }
       
       // If selected card is a network variant, only match exact variants
-      if (selectedCard.includes('(')) {
+      if (normalizedSelected.includes('(')) {
         return false;
       }
       
       // For base card, match base card and all its variants
-      const baseCardName = selectedCard.replace(/\s*\([^)]*\)$/, '').trim();
+      const baseCardName = normalizedSelected.replace(/\s*\([^)]*\)$/, '').trim();
       
       // Check if offer card name matches the base card
-      if (offerCardName.toLowerCase() === baseCardName.toLowerCase()) {
+      if (offerCardName === baseCardName) {
         return true;
       }
       
       // Check if offer is for a network variant of the base card
-      if (offerCardName.toLowerCase().startsWith(baseCardName.toLowerCase() + " ") &&
+      if (offerCardName.startsWith(baseCardName + " ") &&
           offerCardName.includes('(')) {
         return true;
       }
@@ -118,29 +128,30 @@ const CreditCardDropdown = () => {
   };
 
   const getMovieBenefitsForSelectedCard = () => {
+    const normalizedSelected = normalizeCardName(selectedCard);
     return movieBenefits.filter((offer) => {
-      const offerCardName = offer["Credit Card Name"] ? offer["Credit Card Name"].trim() : "";
+      const offerCardName = offer["Credit Card Name"] ? normalizeCardName(offer["Credit Card Name"]) : "";
       
       // Direct match
-      if (offerCardName.toLowerCase() === selectedCard.toLowerCase()) {
+      if (offerCardName === normalizedSelected) {
         return true;
       }
       
       // If selected card is a network variant, only match exact variants
-      if (selectedCard.includes('(')) {
+      if (normalizedSelected.includes('(')) {
         return false;
       }
       
       // For base card, match base card and all its variants
-      const baseCardName = selectedCard.replace(/\s*\([^)]*\)$/, '').trim();
+      const baseCardName = normalizedSelected.replace(/\s*\([^)]*\)$/, '').trim();
       
       // Check if offer card name matches the base card
-      if (offerCardName.toLowerCase() === baseCardName.toLowerCase()) {
+      if (offerCardName === baseCardName) {
         return true;
       }
       
       // Check if offer is for a network variant of the base card
-      if (offerCardName.toLowerCase().startsWith(baseCardName.toLowerCase() + " ") &&
+      if (offerCardName.startsWith(baseCardName + " ") &&
           offerCardName.includes('(')) {
         return true;
       }
@@ -205,31 +216,35 @@ const CreditCardDropdown = () => {
         setPaytmDistrictOffers(paytmData.data);
         setMovieBenefits(benefitsData.data);
 
-        const allCreditCards = new Set();
+        // Use Map to ensure unique normalized names
+        const cardMap = new Map();
         
-        // Add cards from the new "All Cards.csv"
+        // Add cards from the new "All Cards.csv" first (preferred source)
         allCardsData.data.forEach(row => {
-          if (row["Credit Card Name"]) allCreditCards.add(row["Credit Card Name"].trim());
+          if (row["Credit Card Name"]) {
+            const normalized = normalizeCardName(row["Credit Card Name"]);
+            cardMap.set(normalized, normalized);
+          }
         });
         
         // Add cards from other CSV files
-        pvrData.data.forEach(row => {
-          if (row["Credit Card Name"]) allCreditCards.add(row["Credit Card Name"].trim());
-        });
+        const processCSV = (data) => {
+          data.forEach(row => {
+            if (row["Credit Card Name"]) {
+              const normalized = normalizeCardName(row["Credit Card Name"]);
+              if (!cardMap.has(normalized)) {
+                cardMap.set(normalized, normalized);
+              }
+            }
+          });
+        };
         
-        bmsData.data.forEach(row => {
-          if (row["Credit Card Name"]) allCreditCards.add(row["Credit Card Name"].trim());
-        });
-        
-        paytmData.data.forEach(row => {
-          if (row["Credit Card Name"]) allCreditCards.add(row["Credit Card Name"].trim());
-        });
-        
-        benefitsData.data.forEach(row => {
-          if (row["Credit Card Name"]) allCreditCards.add(row["Credit Card Name"].trim());
-        });
+        processCSV(pvrData.data);
+        processCSV(bmsData.data);
+        processCSV(paytmData.data);
+        processCSV(benefitsData.data);
 
-        setCreditCards(Array.from(allCreditCards).sort());
+        setCreditCards(Array.from(cardMap.values()).sort());
       } catch (error) {
         console.error("Error loading CSV data:", error);
       }
