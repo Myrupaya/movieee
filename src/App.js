@@ -190,7 +190,7 @@ const CreditCardDropdown = () => {
           axios.get("/PVR.csv"),
           axios.get("/Bookmyshow.csv"),
           axios.get("/Paytm and District.csv"),
-          axios.get("/Final_Movie_Benefits_List_With_Images.csv"),
+          axios.get("/Permanent offers.csv"),
           axios.get("/All Cards.csv") // NEW CSV FILE ADDED
         ]);
 
