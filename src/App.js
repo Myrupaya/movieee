@@ -68,6 +68,7 @@ const CreditCardDropdown = () => {
   const [typingTimeout, setTypingTimeout] = useState(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // NEW: Loading state
 
   useEffect(() => {
     const checkIfMobile = () => {
@@ -185,17 +186,22 @@ const CreditCardDropdown = () => {
   useEffect(() => {
     const fetchCSVData = async () => {
       try {
-        const [pvrResponse, bmsResponse, paytmResponse, benefitsResponse] = await Promise.all([
+        setIsLoading(true); // NEW: Show loading when starting
+        
+        // Fetch all CSV files including the new "All Cards.csv"
+        const [pvrResponse, bmsResponse, paytmResponse, benefitsResponse, allCardsResponse] = await Promise.all([
           axios.get("/PVR.csv"),
           axios.get("/Bookmyshow.csv"),
           axios.get("/Paytm and District.csv"),
           axios.get("/Final_Movie_Benefits_List_With_Images.csv"),
+          axios.get("/All Cards.csv") // NEW CSV FILE ADDED
         ]);
 
         const pvrData = Papa.parse(pvrResponse.data, { header: true });
         const bmsData = Papa.parse(bmsResponse.data, { header: true });
         const paytmData = Papa.parse(paytmResponse.data, { header: true });
         const benefitsData = Papa.parse(benefitsResponse.data, { header: true });
+        const allCardsData = Papa.parse(allCardsResponse.data, { header: true }); // NEW
 
         setPvrOffers(pvrData.data);
         setBookMyShowOffers(bmsData.data);
@@ -204,6 +210,12 @@ const CreditCardDropdown = () => {
 
         const allCreditCards = new Set();
         
+        // Add cards from the new "All Cards.csv"
+        allCardsData.data.forEach(row => {
+          if (row["Credit Card Name"]) allCreditCards.add(row["Credit Card Name"].trim());
+        });
+        
+        // Add cards from other CSV files
         pvrData.data.forEach(row => {
           if (row["Credit Card Name"]) allCreditCards.add(row["Credit Card Name"].trim());
         });
@@ -221,8 +233,12 @@ const CreditCardDropdown = () => {
         });
 
         setCreditCards(Array.from(allCreditCards).sort());
+        
+        // NEW: Hide loading after data is processed
+        setIsLoading(false);
       } catch (error) {
         console.error("Error loading CSV data:", error);
+        setIsLoading(false); // NEW: Hide loading on error too
       }
     };
 
@@ -289,6 +305,16 @@ const CreditCardDropdown = () => {
     if (typingTimeout) clearTimeout(typingTimeout);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  // NEW: Loading overlay component
+  if (isLoading) {
+    return (
+      <div className="loading-overlay">
+        <div className="loading-spinner"></div>
+        <p>Loading credit card offers...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="App">
