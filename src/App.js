@@ -191,14 +191,14 @@ const CreditCardDropdown = () => {
           axios.get("/Bookmyshow.csv"),
           axios.get("/Paytm and District.csv"),
           axios.get("/Permanent offers.csv"),
-          axios.get("/All Cards.csv") // NEW CSV FILE ADDED
+          axios.get("/All Cards.csv")
         ]);
 
         const pvrData = Papa.parse(pvrResponse.data, { header: true });
         const bmsData = Papa.parse(bmsResponse.data, { header: true });
         const paytmData = Papa.parse(paytmResponse.data, { header: true });
         const benefitsData = Papa.parse(benefitsResponse.data, { header: true });
-        const allCardsData = Papa.parse(allCardsResponse.data, { header: true }); // NEW
+        const allCardsData = Papa.parse(allCardsResponse.data, { header: true });
 
         setPvrOffers(pvrData.data);
         setBookMyShowOffers(bmsData.data);
@@ -421,93 +421,66 @@ const CreditCardDropdown = () => {
                 <h2 style={{ margin: "20px 0" }}>Permanent Offers</h2>
                 <div className="offer-row">
                   {selectedMovieBenefits.map((benefit, index) => (
-                    <div key={`benefit-${index}`} className="offer-card" style={{backgroundColor: "#f5f5f5", color: "black", height:"auto", width:'1000px'}}>
+                    <div key={`benefit-${index}`} className="offer-card">
                       {benefit.image && (
                         <img 
                           src={benefit.image} 
                           alt={benefit["Credit Card Name"] || "Card Offer"} 
-                          style={{ 
-                            maxWidth: "100%", 
-                            height: "auto",
-                            maxHeight: "150px",
-                            objectFit: "contain",
-                          }}
+                          className="benefit-image"
                         />
                       )}
                       
                       {benefit["Movie Benefit"] && <p><strong>Benefit:</strong> {benefit["Movie Benefit"]}</p>}
                       <p> <strong> This is a inbuilt feature of this credit card </strong></p>
-                      
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-{selectedPvrOffers.length > 0 && (
-  <div className="offer-container">
-    <h2>Offers on both PVR and INOX</h2>
-    <div className="offer-row">
-      {selectedPvrOffers.map((offer, index) => (
-        <div 
-          key={`pvr-${index}`} 
-          className={`offer-card ${expandedOfferIndex.pvr === index ? 'expanded' : ''}`}
-          style={{
-            backgroundColor: "#f5f5f5", 
-            color: "black",
-            height: 'auto',
-            overflow: 'hidden',
-           width:'1000px'
-          }}
-        >
-          {offer["Image URL"] && (
-            <img 
-              src={offer["Image URL"]} 
-              alt={offer["Offer Title"] || "PVR Offer"} 
-              style={{ 
-                maxWidth: "100%", 
-                height: "auto",
-                maxHeight: "150px",
-                objectFit: "contain"
-              }} 
-            />
-          )}
-          <h3>{offer["Offer Title"] || "PVR Offer"}</h3>
-          {offer["Validity Date"] && <p><strong>Validity:</strong> {offer["Validity Date"]}</p>}
-          {offer["Coupn Code"] && (
-            <p>
-              <span role="img" aria-label="important" style={{ marginRight: "5px" }}>⚠️</span>
-              <strong>Important:</strong> {offer["Coupn Code"]}
-            </p>
-          )}
-          
-          <button 
-            onClick={() => toggleOfferDetails("pvr", index)}
-            className={`details-btn ${expandedOfferIndex.pvr === index ? "active" : ""}`}
-            style={{ marginTop: '10px' }}
-          >
-            {expandedOfferIndex.pvr === index ? "Hide Terms & Conditions" : "Show Terms & Conditions"}
-          </button>
-          
-          {expandedOfferIndex.pvr === index && (
-            <div className="terms-container">
-              <div style={{
-                maxHeight: '200px', 
-                overflowY: 'auto',
-                padding: '10px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                marginTop: '10px'
-              }}>
-                <p>{offer["Terms and Conditions"]}</p>
+            {selectedPvrOffers.length > 0 && (
+              <div className="offer-container">
+                <h2>Offers on both PVR and INOX</h2>
+                <div className="offer-row">
+                  {selectedPvrOffers.map((offer, index) => (
+                    <div 
+                      key={`pvr-${index}`} 
+                      className={`offer-card ${expandedOfferIndex.pvr === index ? 'expanded' : ''}`}
+                    >
+                      {offer["Image URL"] && (
+                        <img 
+                          src={offer["Image URL"]} 
+                          alt={offer["Offer Title"] || "PVR Offer"} 
+                          className="offer-image"
+                        />
+                      )}
+                      <h3>{offer["Offer Title"] || "PVR Offer"}</h3>
+                      {offer["Validity Date"] && <p><strong>Validity:</strong> {offer["Validity Date"]}</p>}
+                      {offer["Coupn Code"] && (
+                        <p>
+                          <span role="img" aria-label="important" style={{ marginRight: "5px" }}>⚠️</span>
+                          <strong>Important:</strong> {offer["Coupn Code"]}
+                        </p>
+                      )}
+                      
+                      <button 
+                        onClick={() => toggleOfferDetails("pvr", index)}
+                        className={`details-btn ${expandedOfferIndex.pvr === index ? "active" : ""}`}
+                      >
+                        {expandedOfferIndex.pvr === index ? "Hide Terms & Conditions" : "Show Terms & Conditions"}
+                      </button>
+                      
+                      <div className={`terms-container ${expandedOfferIndex.pvr === index ? 'visible' : ''}`}>
+                        <div className="terms-content">
+                          <p>{offer["Terms and Conditions"]}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+            )}
+
             {selectedBookMyShowOffers.length > 0 && (
               <div className="offer-container">
                 <h2>Offers on BookMyShow</h2>
@@ -516,18 +489,12 @@ const CreditCardDropdown = () => {
                     <div 
                       key={`bms-${index}`} 
                       className="offer-card"
-                      style={{ backgroundColor: "#f5f5f5", color: "black", height:"auto" }}
                     >
                       {offer["Offer Image Link"] && (
                         <img 
                           src={offer["Offer Image Link"]} 
                           alt={"BookMyShow Offer"} 
-                          style={{ 
-                            maxWidth: "100%", 
-                            height: "auto",
-                            maxHeight: "150px",
-                            objectFit: "contain"
-                          }} 
+                          className="offer-image"
                         />
                       )}
             
@@ -539,12 +506,9 @@ const CreditCardDropdown = () => {
                           href={offer["Offer Link"]} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          style={{ textDecoration: "none" }}
+                          className="offer-link"
                         >
-                          <button 
-                            className="view-details-btn"
-                            style={{ marginTop: '10px', cursor: 'pointer' }}
-                          >
+                          <button className="view-details-btn">
                             Click for more details
                           </button>
                         </a>
@@ -555,98 +519,61 @@ const CreditCardDropdown = () => {
               </div>
             )}
 
-{selectedPaytmDistrictOffers.length > 0 && (
-  <div className="offer-container">
-    <h2>Offers on Paytm and District</h2>
-    <div className="offer-row">
-      {selectedPaytmDistrictOffers.map((offer, index) => (
-        <div 
-          key={`paytm-${index}`} 
-          className={`offer-card ${expandedOfferIndex.paytm === index ? 'expanded' : ''}`}
-          style={{
-            backgroundColor: "#f5f5f5", 
-            color: "black",
-            height: 'auto',
-            overflow: 'hidden',
-            width: '1000px'
-          }}
-        >
-          {offer["Offer Image Link"] && (
-            <img 
-              src={offer["Offer Image Link"]} 
-              alt={"Paytm & District Offer"} 
-              style={{ 
-                maxWidth: "100%", 
-                height: "auto",
-                maxHeight: "150px",
-                objectFit: "contain"
-              }} 
-            />
-          )}
-          <h3>{offer["Offer title"] || "Paytm & District Offer"}</h3>
-          {offer["Offer description"] && <p><strong>Description:</strong> {offer["Offer description"]}</p>}
-          
-          {offer["Promo code"] && (
-            <div style={{ display: 'flex', alignItems: 'center', margin: '10px 0' }}>
-              <strong>Promo Code: </strong>
-              <span style={{ 
-                padding: '5px 10px', 
-                backgroundColor: '#e9e9e9', 
-                borderRadius: '4px',
-                margin: '0 10px',
-                fontFamily: 'monospace'
-              }}>
-                {offer["Promo code"]}
-              </span>
-              <div 
-                onClick={() => copyToClipboard(offer["Promo code"])}
-                style={{
-                  padding: '6px',
-                  backgroundColor: '#39641D',
-                  color: 'white',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-                title="Copy to clipboard"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
+            {selectedPaytmDistrictOffers.length > 0 && (
+              <div className="offer-container">
+                <h2>Offers on Paytm and District</h2>
+                <div className="offer-row">
+                  {selectedPaytmDistrictOffers.map((offer, index) => (
+                    <div 
+                      key={`paytm-${index}`} 
+                      className={`offer-card ${expandedOfferIndex.paytm === index ? 'expanded' : ''}`}
+                    >
+                      {offer["Offer Image Link"] && (
+                        <img 
+                          src={offer["Offer Image Link"]} 
+                          alt={"Paytm & District Offer"} 
+                          className="offer-image"
+                        />
+                      )}
+                      <h3>{offer["Offer title"] || "Paytm & District Offer"}</h3>
+                      {offer["Offer description"] && <p><strong>Description:</strong> {offer["Offer description"]}</p>}
+                      
+                      {offer["Promo code"] && (
+                        <div className="promo-code-container">
+                          <strong>Promo Code: </strong>
+                          <span className="promo-code">
+                            {offer["Promo code"]}
+                          </span>
+                          <div 
+                            onClick={() => copyToClipboard(offer["Promo code"])}
+                            className="copy-button"
+                            title="Copy to clipboard"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <button 
+                        onClick={() => toggleOfferDetails("paytm", index)}
+                        className={`details-btn ${expandedOfferIndex.paytm === index ? "active" : ""}`}
+                      >
+                        {expandedOfferIndex.paytm === index ? "Hide Terms & Conditions" : "Show Terms & Conditions"}
+                      </button>
+                      
+                      <div className={`terms-container ${expandedOfferIndex.paytm === index ? 'visible' : ''}`}>
+                        <div className="terms-content">
+                          <p>{offer["Offer details"]}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-          
-          <button 
-            onClick={() => toggleOfferDetails("paytm", index)}
-            className={`details-btn ${expandedOfferIndex.paytm === index ? "active" : ""}`}
-            style={{ marginTop: '10px' }}
-          >
-            {expandedOfferIndex.paytm === index ? "Hide Terms & Conditions" : "Show Terms & Conditions"}
-          </button>
-          
-          {expandedOfferIndex.paytm === index && (
-            <div className="terms-container">
-              <div style={{
-                maxHeight: '200px', 
-                overflowY: 'auto',
-                padding: '10px',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                marginTop: '10px'
-              }}>
-                <p>{offer["Offer details"]}</p>
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+            )}
           </div>
         )}
       </div>
