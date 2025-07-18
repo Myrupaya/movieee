@@ -574,12 +574,21 @@ const CreditCardDropdown = () => {
                       </div>
                     );
                   })}
+                     
                 </div>
+                
               </div>
+              
             )}
+            
           </div>
+          
         )}
+     
       </div>
+       {selectedCard && !hasAnyOffers() && !showNoCardMessage ? null : (
+        <p className="bottom-disclaimer"> <h3>Disclaimer</h3> All offers, coupons, and discounts listed on our platform are provided for informational purposes only. We do not guarantee the accuracy, availability, or validity of any offer. Users are advised to verify the terms and conditions with the respective merchants before making any purchase. We are not responsible for any discrepancies, expired offers, or losses arising from the use of these coupons.</p>
+     )}
     </div>
   );
 };

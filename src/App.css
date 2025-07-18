@@ -185,7 +185,6 @@ p {
   min-height: 500px; /* Set minimum height to match all cards */
   position: relative;
   transition: transform 0.3s, box-shadow 0.3s;
-  margin-bottom: 50px;
 }
 
 .offer-card.expanded {
@@ -371,4 +370,8 @@ button, .view-details-btn {
   margin-top: 2px;
   }
 }
+ .bottom-disclaimer{text-align: center;
+          padding: 20px;
+          max-width: 1000px;
+          margin: 0 auto;}
 
