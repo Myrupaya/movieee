@@ -22,26 +22,9 @@ const CreditCardDropdown = () => {
   const [showNoCardMessage, setShowNoCardMessage] = useState(false);
   const [typingTimeout, setTypingTimeout] = useState(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const nearBottom = window.innerHeight + window.scrollY >= document.body.offsetHeight - 100;
-      setShowScrollButton(!nearBottom);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    handleScroll(); // Check initial position
-    
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const handleScrollDown = () => {
-    window.scrollBy({
-      top: window.innerHeight * 0.8,
-      behavior: 'smooth'
-    });
-  };
-
+  // Toggle offer details
   const toggleOfferDetails = (type, index) => {
     setExpandedOfferIndex(prev => ({
       ...prev,
@@ -49,6 +32,42 @@ const CreditCardDropdown = () => {
     }));
   };
 
+  // Handle window resize for mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Handle scroll position for button visibility
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const windowHeight = window.innerHeight;
+      const docHeight = document.documentElement.scrollHeight;
+      
+      setShowScrollButton(scrollTop > 100 && (scrollTop + windowHeight < docHeight - 100));
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Scroll down handler
+  const handleScrollDown = () => {
+    const currentPosition = window.pageYOffset || document.documentElement.scrollTop;
+    const windowHeight = window.innerHeight;
+    
+    window.scrollTo({
+      top: currentPosition + windowHeight * 0.8,
+      behavior: 'smooth'
+    });
+  };
+
+  // Fetch CSV data
   useEffect(() => {
     const fetchCSVData = async () => {
       try {
@@ -120,6 +139,7 @@ const CreditCardDropdown = () => {
     fetchCSVData();
   }, []);
 
+  // Handle search input
   const handleInputChange = (event) => {
     const value = event.target.value;
     setQuery(value);
@@ -167,6 +187,7 @@ const CreditCardDropdown = () => {
     }
   };
 
+  // Handle card selection
   const handleCardSelection = (card) => {
     setSelectedCard(card);
     setQuery(card);
@@ -178,6 +199,7 @@ const CreditCardDropdown = () => {
     }
   };
 
+  // Filter offers for selected card
   const getOffersForSelectedCard = (offers, isDebit = false) => {
     return offers.filter((offer) => {
       if (isDebit) {
@@ -191,6 +213,7 @@ const CreditCardDropdown = () => {
     });
   };
 
+  // Get movie benefits for selected card
   const getMovieBenefitsForSelectedCard = () => {
     return movieBenefits.filter(offer => {
       const cardName = offer["Credit Card Name"] ? offer["Credit Card Name"].trim() : "";
@@ -204,6 +227,7 @@ const CreditCardDropdown = () => {
   const selectedMovieDebitOffers = getOffersForSelectedCard(movieDebitOffers, true);
   const selectedMovieBenefits = getMovieBenefitsForSelectedCard();
 
+  // Check if any offers exist
   const hasAnyOffers = () => {
     return (
       selectedPvrOffers.length > 0 ||
@@ -216,6 +240,34 @@ const CreditCardDropdown = () => {
 
   return (
     <div className="App">
+      {/* Scroll Down Button */}
+      {showScrollButton && (
+        <button 
+          onClick={handleScrollDown}
+          style={{
+            position: 'fixed',
+            right: '20px',
+            bottom: '150px',
+            padding: windowWidth <= 768 ? '12px 16px' : '10px 15px',
+            backgroundColor: '#4CAF50',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50%',
+            cursor: 'pointer',
+            fontSize: windowWidth <= 768 ? '24px' : '16px',
+            zIndex: 1000,
+            boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: windowWidth <= 768 ? '50px' : 'auto',
+            height: windowWidth <= 768 ? '50px' : 'auto'
+          }}
+        >
+          {windowWidth <= 768 ? '↓' : 'Scroll Down'}
+        </button>
+      )}
+      
       <div className="content-container">
         <div className="creditCardDropdown" style={{ position: "relative", width: "600px", margin: "2px auto", marginTop:"2px" }}>
           <input
@@ -517,7 +569,7 @@ const CreditCardDropdown = () => {
                           onClick={() => toggleOfferDetails("bms", index)}
                           className={`details-btn ${expandedOfferIndex.bms === index ? "active" : ""}`}
                           style={{ marginTop: '10px' }}
-                        >
+                      >
                           {expandedOfferIndex.bms === index ? "Hide Details" : "Click For More Details"}
                         </button>
                       )}
@@ -579,36 +631,6 @@ const CreditCardDropdown = () => {
           </div>
         )}
       </div>
-
-      {/* Scroll Down Button */}
-      {showScrollButton && (
-        <button 
-          onClick={handleScrollDown}
-          style={{
-            position: 'fixed',
-            right: '20px',
-            bottom: '20px',
-            padding: window.innerWidth > 768 ? '10px 15px' : '8px 12px',
-            backgroundColor: '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: window.innerWidth > 768 ? '5px' : '50%',
-            cursor: 'pointer',
-            fontSize: window.innerWidth > 768 ? '16px' : '24px',
-            zIndex: 1000,
-            boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
-            width: window.innerWidth > 768 ? 'auto' : '50px',
-            height: window.innerWidth > 768 ? 'auto' : '50px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.3s ease'
-          }}
-          aria-label="Scroll down"
-        >
-          {window.innerWidth > 768 ? 'Scroll Down' : '↓'}
-        </button>
-      )}
     </div>
   );
 };
