@@ -86,9 +86,6 @@ const CreditCardDropdown = () => {
   const [showNoCardMessage, setShowNoCardMessage] = useState(false);
   const [typingTimeout, setTypingTimeout] = useState(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
-<<<<<<< HEAD
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-=======
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -128,9 +125,7 @@ const CreditCardDropdown = () => {
   const selectedBookMyShowOffers = getOffersForSelectedCard(bookMyShowOffers);
   const selectedPaytmDistrictOffers = getOffersForSelectedCard(paytmDistrictOffers);
   const selectedMovieBenefits = getMovieBenefitsForSelectedCard();
->>>>>>> 50e8b47e4ea0ba6f1ce5a0c096c4223e00d7f412
 
-  // Toggle offer details
   const toggleOfferDetails = (type, index) => {
     setExpandedOfferIndex((prev) => ({
       ...prev,
@@ -138,44 +133,6 @@ const CreditCardDropdown = () => {
     }));
   };
 
-<<<<<<< HEAD
-  // Handle window resize for mobile detection
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Handle scroll position for button visibility
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      const windowHeight = window.innerHeight;
-      const docHeight = document.documentElement.scrollHeight;
-      
-      setShowScrollButton(scrollTop > 100 && (scrollTop + windowHeight < docHeight - 100));
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // Scroll down handler
-  const handleScrollDown = () => {
-    const currentPosition = window.pageYOffset || document.documentElement.scrollTop;
-    const windowHeight = window.innerHeight;
-    
-    window.scrollTo({
-      top: currentPosition + windowHeight * 0.8,
-      behavior: 'smooth'
-    });
-  };
-
-  // Fetch CSV data
-=======
   const hasAnyOffers = useCallback(() => {
     return (
       selectedPvrOffers.length > 0 ||
@@ -197,7 +154,6 @@ const CreditCardDropdown = () => {
     });
   };
 
->>>>>>> 50e8b47e4ea0ba6f1ce5a0c096c4223e00d7f412
   useEffect(() => {
     const fetchCSVData = async () => {
       try {
@@ -246,14 +202,10 @@ const CreditCardDropdown = () => {
     fetchCSVData();
   }, []);
 
-<<<<<<< HEAD
-  // Handle search input
-=======
   useEffect(() => {
     setShowScrollButton(selectedCard && hasAnyOffers());
   }, [selectedCard, hasAnyOffers]);
 
->>>>>>> 50e8b47e4ea0ba6f1ce5a0c096c4223e00d7f412
   const handleInputChange = (event) => {
     const value = event.target.value;
     setQuery(value);
@@ -299,7 +251,6 @@ const CreditCardDropdown = () => {
     }
   };
 
-  // Handle card selection
   const handleCardSelection = (card) => {
     setSelectedCard(card);
     setQuery(card);
@@ -310,79 +261,10 @@ const CreditCardDropdown = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-<<<<<<< HEAD
-  // Filter offers for selected card
-  const getOffersForSelectedCard = (offers, isDebit = false) => {
-    return offers.filter((offer) => {
-      if (isDebit) {
-        return (
-          offer["Applicable Debit Cards"] &&
-          offer["Applicable Debit Cards"].split(",").map((c) => c.trim()).includes(selectedCard)
-        );
-      } else {
-        return offer["Credit Card"] && offer["Credit Card"].trim() === selectedCard;
-      }
-    });
-  };
-
-  // Get movie benefits for selected card
-  const getMovieBenefitsForSelectedCard = () => {
-    return movieBenefits.filter(offer => {
-      const cardName = offer["Credit Card Name"] ? offer["Credit Card Name"].trim() : "";
-      return cardName.toLowerCase() === selectedCard.toLowerCase();
-    });
-  };
-
-  const selectedPvrOffers = getOffersForSelectedCard(pvrOffers);
-  const selectedInoxOffers = getOffersForSelectedCard(inoxOffers);
-  const selectedBookMyShowOffers = getOffersForSelectedCard(bookMyShowOffers);
-  const selectedMovieDebitOffers = getOffersForSelectedCard(movieDebitOffers, true);
-  const selectedMovieBenefits = getMovieBenefitsForSelectedCard();
-
-  // Check if any offers exist
-  const hasAnyOffers = () => {
-    return (
-      selectedPvrOffers.length > 0 ||
-      selectedInoxOffers.length > 0 ||
-      selectedBookMyShowOffers.length > 0 ||
-      selectedMovieDebitOffers.length > 0 ||
-      selectedMovieBenefits.length > 0
-    );
-  };
-=======
   // ... rest of your JSX rendering (same as your original) ...
->>>>>>> 50e8b47e4ea0ba6f1ce5a0c096c4223e00d7f412
 
   return (
     <div className="App">
-      {/* Scroll Down Button */}
-      {showScrollButton && (
-        <button 
-          onClick={handleScrollDown}
-          style={{
-            position: 'fixed',
-            right: '20px',
-            bottom: '150px',
-            padding: windowWidth <= 768 ? '12px 16px' : '10px 15px',
-            backgroundColor: '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '50%',
-            cursor: 'pointer',
-            fontSize: windowWidth <= 768 ? '24px' : '16px',
-            zIndex: 1000,
-            boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: windowWidth <= 768 ? '50px' : 'auto',
-            height: windowWidth <= 768 ? '50px' : 'auto'
-          }}
-        >
-          {windowWidth <= 768 ? '↓' : 'Scroll Down'}
-        </button>
-      )}
-      
       <div className="content-container">
         <div className="creditCardDropdown" style={{ position: "relative", width: "600px", margin: "2px auto", marginTop:"2px" }}>
           <input
@@ -502,35 +384,6 @@ const CreditCardDropdown = () => {
               <div className="offer-container">
                 <h2 style={{ margin: "20px 0" }}>Permanent Offers</h2>
                 <div className="offer-row">
-<<<<<<< HEAD
-                  {selectedMovieBenefits.map((benefit, index) => (
-                    <div key={`benefit-${index}`} className="offer-card" style={{backgroundColor: "#f5f5f5", color: "black"}}>
-                      {benefit.image && (
-                        <img 
-                          src={benefit.image} 
-                          alt={benefit["Credit Card Name"] || "Card Offer"} 
-                          style={{ 
-                            maxWidth: "100%", 
-                            height: "auto",
-                            maxHeight: "150px",
-                            objectFit: "contain",
-                          }}
-                        />
-                      )}
-                      <h3>{benefit["Credit Card Name"] || "Card Offer"}</h3>
-                      {benefit["Movie Benefit"] && <p><strong>Benefit:</strong> {benefit["Movie Benefit"]}</p>}
-                      {benefit.Terms && <p><strong>Terms:</strong> {benefit.Terms}</p>}
-                      {benefit.Link && (
-                        <button 
-                          onClick={() => window.open(benefit.Link, "_blank")}
-                          className="view-details-btn"
-                        >
-                          View Details
-                        </button>
-                      )}
-                    </div>
-                  ))}
-=======
                   {selectedMovieBenefits.map((benefit, index) => {
                     const cardName = normalizeCardName(benefit["Credit Card Name"] || "");
                     const network = getNetworkVariant(cardName);
@@ -555,7 +408,6 @@ const CreditCardDropdown = () => {
                       </div>
                     );
                   })}
->>>>>>> 50e8b47e4ea0ba6f1ce5a0c096c4223e00d7f412
                 </div>
               </div>
             )}
@@ -617,74 +469,6 @@ const CreditCardDropdown = () => {
               <div className="offer-container">
                 <h2>Offers on BookMyShow</h2>
                 <div className="offer-row">
-<<<<<<< HEAD
-                  {selectedBookMyShowOffers.map((offer, index) => (
-                    <div 
-                      key={`bms-${index}`} 
-                      className={`offer-card ${expandedOfferIndex.bms === index ? 'expanded' : ''}`}
-                      style={{
-                        backgroundColor: "#f5f5f5", 
-                        color: "black",
-                        height: "auto",
-                        overflow: 'hidden'
-                      }}
-                    >
-                      {offer.Image && (
-                        <img 
-                          src={offer.Image} 
-                          alt={offer.Title || "BookMyShow Offer"} 
-                          style={{ 
-                            maxWidth: "100%", 
-                            height: "auto",
-                            maxHeight: "150px",
-                            objectFit: "contain"
-                          }} 
-                        />
-                      )}
-                      <h3>{offer.Title || "BookMyShow Offer"}</h3>
-                      {offer.Offer && <p><strong>Offer:</strong> {offer.Offer}</p>}
-                      {offer.Validity && <p><strong>Validity:</strong> {offer.Validity}</p>}
-                      
-                      {expandedOfferIndex.bms === index && (
-                        <div className="terms-container" style={{ 
-                          maxHeight: '200px',
-                          overflowY: 'auto',
-                          padding: '10px',
-                          backgroundColor: 'rgba(0,0,0,0.1)',
-                          borderRadius: '5px',
-                          marginTop: '10px'
-                        }}>
-                          <h4>Offer Details:</h4>
-                          <p>{offer.Offers || "No additional details available"}</p>
-                        </div>
-                      )}
-                      
-                      {offer.Link ? (
-                        <a 
-                          href={offer.Link} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          style={{ textDecoration: "none" }}
-                        >
-                          <button 
-                            className="view-details-btn"
-                            style={{ marginTop: '10px', cursor: 'pointer' }}
-                          >
-                            View Details
-                          </button>
-                        </a>
-                      ) : (
-                        <button 
-                          onClick={() => toggleOfferDetails("bms", index)}
-                          className={`details-btn ${expandedOfferIndex.bms === index ? "active" : ""}`}
-                          style={{ marginTop: '10px' }}
-                      >
-                          {expandedOfferIndex.bms === index ? "Hide Details" : "Click For More Details"}
-                        </button>
-                      )}
-                    </div>
-                  ))}
-=======
                   {selectedBookMyShowOffers.map((offer, index) => {
                     const cardName = normalizeCardName(offer["Credit Card Name"] || "");
                     const network = getNetworkVariant(cardName);
@@ -724,7 +508,6 @@ const CreditCardDropdown = () => {
                       </div>
                     );
                   })}
->>>>>>> 50e8b47e4ea0ba6f1ce5a0c096c4223e00d7f412
                 </div>
               </div>
             )}
@@ -733,44 +516,6 @@ const CreditCardDropdown = () => {
               <div className="offer-container">
                 <h2>Offers on Paytm and District</h2>
                 <div className="offer-row">
-<<<<<<< HEAD
-                  {selectedMovieDebitOffers.map((offer, index) => (
-                    <div 
-                      key={`debit-${index}`} 
-                      className="offer-card" 
-                      style={{ backgroundColor: "#f5f5f5", color: "black" }}
-                    >
-                      {offer.Image && (
-                        <img 
-                          src={offer.Image} 
-                          alt={offer.Website || "Debit Card Offer"} 
-                          style={{ 
-                            maxWidth: "100%", 
-                            height: "auto",
-                            maxHeight: "150px",
-                            objectFit: "contain"
-                          }}
-                        />
-                      )}
-                      <h3>{offer.Website || "Debit Card Offer"}</h3>
-                      {offer.Offer && <p>{offer.Offer}</p>}
-                      {offer.Link && (
-                        <a 
-                          href={offer.Link} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="view-details-btn"
-                          style={{
-                            display: "inline-block",
-                            padding: "10px 20px",
-                            backgroundColor: "#1e7145",
-                            color: "#fff",
-                            borderRadius: "5px",
-                            textDecoration: "none",
-                            fontWeight: "bold",
-                            marginTop: "10px"
-                          }}
-=======
                   {selectedPaytmDistrictOffers.map((offer, index) => {
                     const cardName = normalizeCardName(offer["Credit Card Name"] || "");
                     const network = getNetworkVariant(cardName);
@@ -817,7 +562,6 @@ const CreditCardDropdown = () => {
                         <button 
                           onClick={() => toggleOfferDetails("paytm", index)}
                           className={`details-btn ${expandedOfferIndex.paytm === index ? "active" : ""}`}
->>>>>>> 50e8b47e4ea0ba6f1ce5a0c096c4223e00d7f412
                         >
                           {expandedOfferIndex.paytm === index ? "Hide Terms & Conditions" : "Show Terms & Conditions"}
                         </button>
