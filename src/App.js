@@ -1,596 +1,623 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Papa from "papaparse";
 import "./App.css";
 
-// Helper function to normalize card names
-const normalizeCardName = (name) => {
-  if (!name) return '';
-  return name.trim()
+/** -------------------- CONFIG -------------------- */
+const LIST_FIELDS = {
+  credit: ["Eligible Credit Cards", "Eligible Cards"],
+  debit: ["Eligible Debit Cards", "Applicable Debit Cards"],
+  title: ["Offer Title", "Title"],
+  image: ["Image", "Credit Card Image", "Offer Image", "image", "Image URL"], // ✅ added "Image URL"
+  link: ["Link", "Offer Link"],
+  desc: ["Description", "Details", "Offer Description", "Flight Benefit"],
+  // Permanent (inbuilt) CSV fields
+  permanentCCName: ["Credit Card Name"],
+  permanentBenefit: ["Movie Benefit", "Benefit", "Offer", "Hotel Benefit"],
+};
+
+const MAX_SUGGESTIONS = 50;
+
+/** Sites that should display the red per-card “Applicable only on {variant} variant” note */
+const VARIANT_NOTE_SITES = new Set([
+  "Bookmyshow",
+  "Cinepolis",
+  "Paytm and District",
+  "PVR",
+  "Permanent",
+]);
+
+/** Sites whose description should be in a scrollable T&C-style box */
+const SCROLL_SITES = new Set([
+  "Bookmyshow",
+  "Cinepolis",
+  "Paytm and District",
+  "PVR",
+]);
+
+/** -------------------- HELPERS -------------------- */
+const toNorm = (s) =>
+  String(s || "")
     .toLowerCase()
-    .replace(/\b\w/g, c => c.toUpperCase())
-    .replace(/\s+/g, ' ');
-};
+    .normalize("NFKD")
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
-// Helper to extract base card name (remove network variant)
-const getBaseCardName = (name) => {
-  if (!name) return '';
-  return name.replace(/\s*\([^)]*\)$/, '').trim();
-};
-
-// Helper to extract network variant
-const getNetworkVariant = (name) => {
-  if (!name) return '';
-  const match = name.match(/\(([^)]+)\)$/);
-  return match ? match[1] : '';
-};
-
-// Fuzzy matching utility functions
-const levenshteinDistance = (a, b) => {
-  if (!a || !b) return 100;
-  const matrix = [];
-  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
-  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
-
-  for (let i = 1; i <= b.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      const cost = b.charAt(i - 1) === a.charAt(j - 1) ? 0 : 1;
-      matrix[i][j] = Math.min(
-        matrix[i - 1][j] + 1,
-        matrix[i][j - 1] + 1,
-        matrix[i - 1][j - 1] + cost
-      );
+function firstField(obj, keys) {
+  for (const k of keys) {
+    if (
+      obj &&
+      Object.prototype.hasOwnProperty.call(obj, k) &&
+      obj[k] !== undefined &&
+      obj[k] !== null &&
+      String(obj[k]).trim() !== ""
+    ) {
+      return obj[k];
     }
   }
-  return matrix[b.length][a.length];
-};
+  return undefined;
+}
 
-const getMatchScore = (query, card) => {
-  if (!query || !card) return 0;
-  const qWords = query.trim().toLowerCase().split(/\s+/);
-  const cWords = card.trim().toLowerCase().split(/\s+/);
+function splitList(val) {
+  if (!val) return [];
+  return String(val)
+    .replace(/\n/g, " ")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
 
-  if (card.toLowerCase().includes(query.toLowerCase())) return 100;
+/** Strip trailing parentheses: "HDFC Regalia (Visa Signature)" -> "HDFC Regalia" */
+function getBase(name) {
+  if (!name) return "";
+  return String(name).replace(/\s*\([^)]*\)\s*$/, "").trim();
+}
 
-  const matchingWords = qWords.filter(qWord =>
-    cWords.some(cWord => cWord.includes(qWord))
-  ).length;
+/** Variant if present at end-in-parens: "… (Visa Signature)" -> "Visa Signature" */
+function getVariant(name) {
+  if (!name) return "";
+  const m = String(name).match(/\(([^)]+)\)\s*$/);
+  return m ? m[1].trim() : "";
+}
 
-  const similarity = 1 - (levenshteinDistance(query.toLowerCase(), card.toLowerCase()) /
-    Math.max(query.length, card.length));
+/** Canonicalize some common brand spellings */
+function brandCanonicalize(text) {
+  let s = String(text || "");
+  s = s.replace(/\bMakemytrip\b/gi, "MakeMyTrip");
+  s = s.replace(/\bIcici\b/gi, "ICICI");
+  s = s.replace(/\bHdfc\b/gi, "HDFC");
+  s = s.replace(/\bSbi\b/gi, "SBI");
+  s = s.replace(/\bIdfc\b/gi, "IDFC");
+  s = s.replace(/\bPnb\b/gi, "PNB");
+  s = s.replace(/\bRbl\b/gi, "RBL");
+  s = s.replace(/\bYes\b/gi, "YES");
+  return s;
+}
 
-  return (matchingWords / qWords.length) * 0.7 + similarity * 0.3;
-};
+/** Levenshtein distance */
+function lev(a, b) {
+  a = toNorm(a);
+  b = toNorm(b);
+  const n = a.length, m = b.length;
+  if (!n) return m;
+  if (!m) return n;
+  const d = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
+  for (let i = 0; i <= n; i++) d[i][0] = i;
+  for (let j = 0; j <= m; j++) d[0][j] = j;
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+    }
+  }
+  return d[n][m];
+}
 
-const highlightMatch = (text, query) => {
-  if (!query.trim()) return text;
+function scoreCandidate(q, cand) {
+  const qs = toNorm(q);
+  const cs = toNorm(cand);
+  if (!qs) return 0;
+  if (cs.includes(qs)) return 100;
 
-  const regex = new RegExp(`(${query.trim().split(/\s+/).map(word =>
-    word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+  const qWords = qs.split(" ").filter(Boolean);
+  const cWords = cs.split(" ").filter(Boolean);
 
-  return text.split(regex).map((part, i) =>
-    regex.test(part) ? <mark key={i}>{part}</mark> : part
-  );
-};
+  const matchingWords = qWords.filter((qw) => cWords.some((cw) => cw.includes(qw))).length;
+  const sim = 1 - lev(qs, cs) / Math.max(qs.length, cs.length);
+  return (matchingWords / Math.max(1, qWords.length)) * 0.7 + sim * 0.3;
+}
 
-const CreditCardDropdown = () => {
-  const [creditCards, setCreditCards] = useState([]);
+/** Dropdown entry builder */
+function makeEntry(raw, type) {
+  const base = brandCanonicalize(getBase(raw));
+  return { type, display: base, baseNorm: toNorm(base) };
+}
+
+function normalizeUrl(u) {
+  if (!u) return "";
+  let s = String(u).trim().toLowerCase();
+  s = s.replace(/^https?:\/\//, "").replace(/^www\./, "");
+  if (s.endsWith("/")) s = s.slice(0, -1);
+  return s;
+}
+function normalizeText(s) {
+  return toNorm(s || "");
+}
+function offerKey(offer) {
+  const image = normalizeUrl(firstField(offer, LIST_FIELDS.image) || "");
+  const title = normalizeText(firstField(offer, LIST_FIELDS.title) || offer.Website || "");
+  const desc = normalizeText(firstField(offer, LIST_FIELDS.desc) || "");
+  const link = normalizeUrl(firstField(offer, LIST_FIELDS.link) || "");
+  return `${title}||${desc}||${image}||${link}`;
+}
+
+function dedupWrappers(arr, seen) {
+  const out = [];
+  for (const w of arr || []) {
+    const k = offerKey(w.offer);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(w);
+  }
+  return out;
+}
+
+/** Disclaimer */
+const Disclaimer = () => (
+  <section className="disclaimer">
+    <h3>Disclaimer</h3>
+    <p>
+      All offers, coupons, and discounts listed on our platform are provided for informational purposes only.
+      We do not guarantee the accuracy, availability, or validity of any offer. Users are advised to verify the
+      terms and conditions with the respective merchants before making any purchase. We are not responsible for any
+      discrepancies, expired offers, or losses arising from the use of these coupons.
+    </p>
+  </section>
+);
+
+/** -------------------- COMPONENT -------------------- */
+const HotelOffers = () => {
+  // dropdown data (from all_cards.csv ONLY)
+  const [creditEntries, setCreditEntries] = useState([]);
+  const [debitEntries, setDebitEntries] = useState([]);
+
+  // ui state
   const [filteredCards, setFilteredCards] = useState([]);
   const [query, setQuery] = useState("");
-  const [selectedCard, setSelectedCard] = useState("");
-  const [pvrOffers, setPvrOffers] = useState([]);
-  const [bookMyShowOffers, setBookMyShowOffers] = useState([]);
-  const [paytmDistrictOffers, setPaytmDistrictOffers] = useState([]);
-  const [movieBenefits, setMovieBenefits] = useState([]);
-  const [expandedOfferIndex, setExpandedOfferIndex] = useState({ pvr: null, bms: null, paytm: null });
-  const [showNoCardMessage, setShowNoCardMessage] = useState(false);
-  const [typingTimeout, setTypingTimeout] = useState(null);
-  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [selected, setSelected] = useState(null); // {type, display, baseNorm}
+  const [noMatches, setNoMatches] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
+  // offers (only these four + permanent)
+  const [bmsOffers, setBMSOffers] = useState([]);                   // BookMyShow
+  const [cinepolisOffers, setCinepolisOffers] = useState([]);       // Cinepolis
+  const [paytmDistrictOffers, setPaytmDistrictOffers] = useState([]); // Paytm & District
+  const [pvrOffers, setPVROffers] = useState([]);                   // PVR
+  const [permanentOffers, setPermanentOffers] = useState([]);       // Permanent
+
+  // responsive
   useEffect(() => {
-    const checkIfMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    checkIfMobile();
-    window.addEventListener('resize', checkIfMobile);
-    return () => window.removeEventListener('resize', checkIfMobile);
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text).then(() => {
-      alert("Promo code copied: " + text);
-    });
-  };
-
-  const getOffersForSelectedCard = (offers) => {
-    if (!selectedCard) return [];
-    return offers.filter((offer) => {
-      const offerCardName = offer["Credit Card Name"] ? normalizeCardName(offer["Credit Card Name"]) : "";
-      const offerBaseName = getBaseCardName(offerCardName);
-      return offerBaseName.toLowerCase() === selectedCard.toLowerCase();
-    });
-  };
-
-  const getMovieBenefitsForSelectedCard = () => {
-    if (!selectedCard) return [];
-    return movieBenefits.filter((offer) => {
-      const offerCardName = offer["Credit Card Name"] ? normalizeCardName(offer["Credit Card Name"]) : "";
-      const offerBaseName = getBaseCardName(offerCardName);
-      return offerBaseName.toLowerCase() === selectedCard.toLowerCase();
-    });
-  };
-
-  const selectedPvrOffers = getOffersForSelectedCard(pvrOffers);
-  const selectedBookMyShowOffers = getOffersForSelectedCard(bookMyShowOffers);
-  const selectedPaytmDistrictOffers = getOffersForSelectedCard(paytmDistrictOffers);
-  const selectedMovieBenefits = getMovieBenefitsForSelectedCard();
-
-  const toggleOfferDetails = (type, index) => {
-    setExpandedOfferIndex((prev) => ({
-      ...prev,
-      [type]: prev[type] === index ? null : index,
-    }));
-  };
-
-  const hasAnyOffers = useCallback(() => {
-    return (
-      selectedPvrOffers.length > 0 ||
-      selectedBookMyShowOffers.length > 0 ||
-      selectedPaytmDistrictOffers.length > 0 ||
-      selectedMovieBenefits.length > 0
-    );
-  }, [
-    selectedPvrOffers,
-    selectedBookMyShowOffers,
-    selectedPaytmDistrictOffers,
-    selectedMovieBenefits,
-  ]);
-
-  const handleScrollDown = () => {
-    window.scrollTo({
-      top: document.documentElement.scrollHeight,
-      behavior: "smooth"
-    });
-  };
-
+  // 1) Load all_cards.csv for dropdown lists ONLY
   useEffect(() => {
-    const fetchCSVData = async () => {
+    async function loadAllCards() {
       try {
-        const [pvrResponse, bmsResponse, paytmResponse, benefitsResponse, allCardsResponse] = await Promise.all([
-          axios.get("/PVR.csv"),
-          axios.get("/Bookmyshow.csv"),
-          axios.get("/Paytm and District.csv"),
-          axios.get("/Permanent offers.csv"),
-          axios.get("/All Cards.csv")
+        const res = await axios.get(`/allCards.csv`);
+        const parsed = Papa.parse(res.data, { header: true });
+        const rows = parsed.data || [];
+
+        const creditMap = new Map();
+        const debitMap = new Map();
+
+        for (const row of rows) {
+          const ccList = splitList(firstField(row, LIST_FIELDS.credit));
+          for (const raw of ccList) {
+            const base = brandCanonicalize(getBase(raw));
+            const baseNorm = toNorm(base);
+            if (baseNorm) creditMap.set(baseNorm, creditMap.get(baseNorm) || base);
+          }
+          const dcList = splitList(firstField(row, LIST_FIELDS.debit));
+          for (const raw of dcList) {
+            const base = brandCanonicalize(getBase(raw));
+            const baseNorm = toNorm(base);
+            if (baseNorm) debitMap.set(baseNorm, debitMap.get(baseNorm) || base);
+          }
+        }
+
+        const credit = Array.from(creditMap.values())
+          .sort((a, b) => a.localeCompare(b))
+          .map((d) => makeEntry(d, "credit"));
+        const debit = Array.from(debitMap.values())
+          .sort((a, b) => a.localeCompare(b))
+          .map((d) => makeEntry(d, "debit"));
+
+        setCreditEntries(credit);
+        setDebitEntries(debit);
+
+        setFilteredCards([
+          ...(credit.length ? [{ type: "heading", label: "Credit Cards" }] : []),
+          ...credit,
+          ...(debit.length ? [{ type: "heading", label: "Debit Cards" }] : []),
+          ...debit,
         ]);
 
-        const pvrData = Papa.parse(pvrResponse.data, { header: true });
-        const bmsData = Papa.parse(bmsResponse.data, { header: true });
-        const paytmData = Papa.parse(paytmResponse.data, { header: true });
-        const benefitsData = Papa.parse(benefitsResponse.data, { header: true });
-        const allCardsParsed = Papa.parse(allCardsResponse.data, { header: true });
-
-        setPvrOffers(pvrData.data);
-        setBookMyShowOffers(bmsData.data);
-        setPaytmDistrictOffers(paytmData.data);
-        setMovieBenefits(benefitsData.data);
-
-        const baseCardSet = new Set();
-
-        const processCSV = (data) => {
-          data.forEach(row => {
-            if (row["Credit Card Name"]) {
-              const baseName = getBaseCardName(normalizeCardName(row["Credit Card Name"]));
-              baseCardSet.add(baseName);
-            }
-          });
-        };
-
-        processCSV(allCardsParsed.data);
-        processCSV(pvrData.data);
-        processCSV(bmsData.data);
-        processCSV(paytmData.data);
-        processCSV(benefitsData.data);
-
-        setCreditCards(Array.from(baseCardSet).sort());
-      } catch (error) {
-        console.error("Error loading CSV data:", error);
+        if (!credit.length && !debit.length) {
+          setNoMatches(true);
+          setSelected(null);
+        }
+      } catch (e) {
+        console.error("all_cards.csv load error:", e);
+        setNoMatches(true);
+        setSelected(null);
       }
-    };
-
-    fetchCSVData();
+    }
+    loadAllCards();
   }, []);
 
+  // 2) Load ONLY the requested offer CSVs
   useEffect(() => {
-    setShowScrollButton(selectedCard && hasAnyOffers());
-  }, [selectedCard, hasAnyOffers]);
+    async function loadOffers() {
+      try {
+        const files = [
+          { name: "bookmyshow.csv", setter: setBMSOffers },
+          { name: "cienpolis.csv", setter: setCinepolisOffers },
+          { name: "district_paytm.csv", setter: setPaytmDistrictOffers },
+          { name: "pvr.csv", setter: setPVROffers },
+          { name: "permanent_offers.csv", setter: setPermanentOffers },
+        ];
 
-  const handleInputChange = (event) => {
-    const value = event.target.value;
-    setQuery(value);
-    setShowNoCardMessage(false);
+        await Promise.all(
+          files.map(async (f) => {
+            const res = await axios.get(`/${encodeURIComponent(f.name)}`);
+            const parsed = Papa.parse(res.data, { header: true });
+            f.setter(parsed.data || []);
+          })
+        );
+      } catch (e) {
+        console.error("Offer CSV load error:", e);
+      }
+    }
+    loadOffers();
+  }, []);
 
-    if (typingTimeout) clearTimeout(typingTimeout);
+  /** search box */
+  const onChangeQuery = (e) => {
+    const val = e.target.value;
+    setQuery(val);
 
-    if (!value) {
-      setSelectedCard("");
+    if (!val.trim()) {
+      setFilteredCards([]);
+      setSelected(null);
+      setNoMatches(false);
+      return;
+    }
+
+    const q = val.trim().toLowerCase();
+    const scored = (arr) =>
+      arr
+        .map((it) => {
+          const s = scoreCandidate(val, it.display);
+          const inc = it.display.toLowerCase().includes(q);
+          return { it, s, inc };
+        })
+        .filter(({ s, inc }) => inc || s > 0.3)
+        .sort((a, b) => (b.s - a.s) || a.it.display.localeCompare(b.it.display))
+        .slice(0, MAX_SUGGESTIONS)
+        .map(({ it }) => it);
+
+    const cc = scored(creditEntries);
+    const dc = scored(debitEntries);
+
+    if (!cc.length && !dc.length) {
+      setNoMatches(true);
+      setSelected(null);
       setFilteredCards([]);
       return;
     }
 
-    if (selectedCard && value !== selectedCard) {
-      setSelectedCard("");
-    }
-
-    const scoredCards = creditCards.map(card => ({
-      card,
-      score: getMatchScore(value, card)
-    }))
-      .filter(item => item.score > 0.3)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 10);
-
-    const combinedResults = [];
-    if (scoredCards.length > 0) {
-      combinedResults.push({ type: "heading", label: "Credit Cards" });
-      combinedResults.push(...scoredCards.map(item => ({
-        type: "credit",
-        card: item.card,
-        score: item.score
-      })));
-    }
-
-    setFilteredCards(combinedResults);
-
-    if (combinedResults.length === 0 && value.length > 2) {
-      const timeout = setTimeout(() => {
-        setShowNoCardMessage(true);
-      }, 1000);
-      setTypingTimeout(timeout);
-    }
+    setNoMatches(false);
+    setFilteredCards([
+      ...(cc.length ? [{ type: "heading", label: "Credit Cards" }] : []),
+      ...cc,
+      ...(dc.length ? [{ type: "heading", label: "Debit Cards" }] : []),
+      ...dc,
+    ]);
   };
 
-  const handleCardSelection = (card) => {
-    setSelectedCard(card);
-    setQuery(card);
+  const onPick = (entry) => {
+    setSelected(entry);
+    setQuery(entry.display);
     setFilteredCards([]);
-    setExpandedOfferIndex({ pvr: null, bms: null, paytm: null });
-    setShowNoCardMessage(false);
-    if (typingTimeout) clearTimeout(typingTimeout);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setNoMatches(false);
   };
 
-  // ... rest of your JSX rendering (same as your original) ...
+  /** Build matches for one CSV: return wrappers {offer, site, variantText} */
+  function matchesFor(offers, type, site) {
+    if (!selected) return [];
+    const out = [];
+    for (const o of offers || []) {
+      let list = [];
+      if (type === "permanent") {
+        const nm = firstField(o, LIST_FIELDS.permanentCCName);
+        if (nm) list = [nm]; // single card name
+      } else if (type === "debit") {
+        list = splitList(firstField(o, LIST_FIELDS.debit));
+      } else {
+        list = splitList(firstField(o, LIST_FIELDS.credit));
+      }
 
-  return (
-    <div className="App">
-      <div className="content-container">
-        <div className="creditCardDropdown" style={{ position: "relative", width: "600px", margin: "2px auto", marginTop:"2px" }}>
-          <input
-            type="text"
-            value={query}
-            onChange={handleInputChange}
-            placeholder="Type a Credit Card..."
-            style={{
-              width: "90%",
-              padding: "12px",
-              fontSize: "16px",
-              border: `1px solid ${showNoCardMessage ? 'red' : '#ccc'}`,
-              borderRadius: "5px",
-            }}
-          />
-          {filteredCards.length > 0 && (
-            <ul
-              style={{
-                listStyleType: "none",
-                padding: "10px",
-                margin: 0,
-                width: "90%",
-                maxHeight: "200px",
-                overflowY: "auto",
-                border: "1px solid #ccc",
-                borderRadius: "5px",
-                backgroundColor: "#fff",
-                position: "absolute",
-                zIndex: 1000,
-              }}
+      let matched = false;
+      let matchedVariant = "";
+      for (const raw of list) {
+        const base = brandCanonicalize(getBase(raw));
+        if (toNorm(base) === selected.baseNorm) {
+          matched = true;
+          const v = getVariant(raw);
+          if (v) matchedVariant = v;
+          break;
+        }
+      }
+      if (matched) {
+        out.push({ offer: o, site, variantText: matchedVariant });
+      }
+    }
+    return out;
+  }
+
+  // Collect then global-dedup
+  const wPermanent = matchesFor(permanentOffers, "permanent", "Permanent");
+  const wBMS = matchesFor(bmsOffers, selected?.type === "debit" ? "debit" : "credit", "Bookmyshow");
+  const wCinepolis = matchesFor(cinepolisOffers, selected?.type === "debit" ? "debit" : "credit", "Cinepolis");
+  const wPaytmDistrict = matchesFor(paytmDistrictOffers, selected?.type === "debit" ? "debit" : "credit", "Paytm and District");
+  const wPVR = matchesFor(pvrOffers, selected?.type === "debit" ? "debit" : "credit", "PVR");
+
+  const seen = new Set();
+  const dPermanent = dedupWrappers(wPermanent, seen);
+  const dBMS = dedupWrappers(wBMS, seen);
+  const dCinepolis = dedupWrappers(wCinepolis, seen);
+  const dPaytmDistrict = dedupWrappers(wPaytmDistrict, seen);
+  const dPVR = dedupWrappers(wPVR, seen);
+
+  const hasAny = Boolean(
+    dPermanent.length ||
+    dBMS.length ||
+    dCinepolis.length ||
+    dPaytmDistrict.length ||
+    dPVR.length
+  );
+
+  /** Offer card UI
+   *  - Shows only image, description, and button
+   *  - Variant note (when present and site is in VARIANT_NOTE_SITES)
+   *  - Scrollable T&C-style description for Bookmyshow, Cinepolis, Paytm and District, PVR
+   */
+  const OfferCard = ({ wrapper, isPermanent = false }) => {
+    const o = wrapper.offer;
+    const image = firstField(o, LIST_FIELDS.image);
+    const link = firstField(o, LIST_FIELDS.link);
+
+    const desc = isPermanent
+      ? firstField(o, LIST_FIELDS.permanentBenefit)
+      : firstField(o, LIST_FIELDS.desc);
+
+    const showVariantNote =
+      VARIANT_NOTE_SITES.has(wrapper.site) &&
+      wrapper.variantText &&
+      wrapper.variantText.trim().length > 0;
+
+    const useScroll = SCROLL_SITES.has(wrapper.site);
+
+    return (
+      <div className="offer-card">
+        {image && <img src={image} alt="Offer" />}
+        <div className="offer-info">
+          {desc && (
+            <div
+              className="offer-desc"
+              style={
+                useScroll
+                  ? {
+                      maxHeight: 140,   // T&C style scroll area
+                      overflowY: "auto",
+                      paddingRight: 8,
+                      border: "1px solid #eee",
+                      borderRadius: 6,
+                      padding: "10px 12px",
+                      background: "#fafafa",
+                      lineHeight: 1.5,
+                      whiteSpace: "pre-wrap",
+                    }
+                  : undefined
+              }
             >
-              {filteredCards.map((item, index) =>
-                item.type === "heading" ? (
-                  <li key={index} className="dropdown-heading">
-                    <strong>{item.label}</strong>
-                  </li>
-                ) : (
-                  <li
-                    key={index}
-                    onClick={() => handleCardSelection(item.card)}
-                    style={{
-                      padding: "10px",
-                      cursor: "pointer",
-                      borderBottom: index !== filteredCards.length - 1 ? "1px solid #eee" : "none",
-                      backgroundColor: item.score > 0.8 ? "#f8fff0" : 
-                                      item.score > 0.6 ? "#fff8e1" : "#fff"
-                    }}
-                    onMouseOver={(e) => (e.target.style.backgroundColor = "#f0f0f0")}
-                    onMouseOut={(e) => (e.target.style.backgroundColor = 
-                      item.score > 0.8 ? "#f8fff0" : 
-                      item.score > 0.6 ? "#fff8e1" : "#fff")}
-                  >
-                    {highlightMatch(item.card, query)}
-                    {item.score < 0.8 && (
-                      <span style={{ 
-                        float: "right", 
-                        color: "#999", 
-                        fontSize: "0.8em"
-                      }}>
-                        Similar
-                      </span>
-                    )}
-                  </li>
-                )
-              )}
-            </ul>
+              {desc}
+            </div>
+          )}
+
+          {showVariantNote && (
+            <p className="network-note" style={{ color: "#b00020", marginTop: 8 }}>
+              <strong>Note:</strong> This benefit is applicable only on <em>{wrapper.variantText}</em> variant
+            </p>
+          )}
+
+          {link && (
+            <button className="btn" onClick={() => window.open(link, "_blank")}>
+              View Offer
+            </button>
           )}
         </div>
-
-        {showScrollButton && (
-          <button 
-            onClick={handleScrollDown}
-            style={{
-              position: "fixed",
-              bottom: "350px",
-              right: "20px",
-              padding: isMobile ? "12px" : "10px 15px",
-              backgroundColor: "#1e7145",
-              color: "white",
-              border: "none",
-              borderRadius: "5px",
-              cursor: "pointer",
-              zIndex: 1000,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: isMobile ? "40px" : "auto",
-              height: isMobile ? "40px" : "auto"
-            }}
-            aria-label="Scroll down"
-          >
-            {isMobile ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 9l6 6 6-6"/>
-              </svg>
-            ) : (
-              <span>Scroll Down</span>
-            )}
-          </button>
-        )}
-
-        {showNoCardMessage && (
-          <div style={{ textAlign: "center", margin: "40px 0", fontSize: "20px", color: "red", fontWeight: "bold" }}>
-            No offers for this card
-          </div>
-        )}
-
-        {selectedCard && !hasAnyOffers() && !showNoCardMessage && (
-          <div style={{ textAlign: "center", margin: "40px 0", fontSize: "20px", color: "#666" }}>
-            No offers found for {selectedCard}
-          </div>
-        )}
-
-        {selectedCard && hasAnyOffers() && (
-          <div className="offer-section">
-            {selectedMovieBenefits.length > 0 && (
-              <div className="offer-container">
-                <h2 style={{ margin: "20px 0" }}>Permanent Offers</h2>
-                <div className="offer-row">
-                  {selectedMovieBenefits.map((benefit, index) => {
-                    const cardName = normalizeCardName(benefit["Credit Card Name"] || "");
-                    const network = getNetworkVariant(cardName);
-                    
-                    return (
-                      <div key={`benefit-${index}`} className="offer-card">
-                        {benefit.image && (
-                          <img 
-                            src={benefit.image} 
-                            alt={cardName || "Card Offer"} 
-                            className="benefit-image"
-                          />
-                        )}
-                        
-                        {benefit["Movie Benefit"] && <p><strong>Benefit:</strong> {benefit["Movie Benefit"]}</p>}
-                        {network && (
-                          <p className="network-note">
-                            <strong>Note:</strong> This benefit is applicable only on {network} variant
-                          </p>
-                        )}
-                        <p> <strong> This is a inbuilt feature of this credit card </strong></p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {selectedPvrOffers.length > 0 && (
-              <div className="offer-container">
-                <h2>Offers on both PVR and INOX</h2>
-                <div className="offer-row">
-                  {selectedPvrOffers.map((offer, index) => {
-                    const cardName = normalizeCardName(offer["Credit Card Name"] || "");
-                    const network = getNetworkVariant(cardName);
-                    
-                    return (
-                      <div 
-                        key={`pvr-${index}`} 
-                        className={`offer-card ${expandedOfferIndex.pvr === index ? 'expanded' : ''}`}
-                      >
-                        {offer["Image URL"] && (
-                          <img 
-                            src={offer["Image URL"]} 
-                            alt={offer["Offer Title"] || "PVR Offer"} 
-                            className="offer-image"
-                          />
-                        )}
-                        <h3>{offer["Offer Title"] || "PVR Offer"}</h3>
-                        {network && (
-                          <p className="network-note">
-                            <strong>Note:</strong> This offer is applicable only on {network} variant
-                          </p>
-                        )}
-                        {offer["Validity Date"] && <p><strong>Validity:</strong> {offer["Validity Date"]}</p>}
-                        {offer["Coupn Code"] && (
-                          <p>
-                            <span role="img" aria-label="important" style={{ marginRight: "5px" }}>⚠️</span>
-                            <strong>Important:</strong> {offer["Coupn Code"]}
-                          </p>
-                        )}
-                        
-                        <button 
-                          onClick={() => toggleOfferDetails("pvr", index)}
-                          className={`details-btn ${expandedOfferIndex.pvr === index ? "active" : ""}`}
-                        >
-                          {expandedOfferIndex.pvr === index ? "Hide Terms & Conditions" : "Show Terms & Conditions"}
-                        </button>
-                        
-                        <div className={`terms-container ${expandedOfferIndex.pvr === index ? 'visible' : ''}`}>
-                          <div className="terms-content">
-                            <p>{offer["Terms and Conditions"]}</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {selectedBookMyShowOffers.length > 0 && (
-              <div className="offer-container">
-                <h2>Offers on BookMyShow</h2>
-                <div className="offer-row">
-                  {selectedBookMyShowOffers.map((offer, index) => {
-                    const cardName = normalizeCardName(offer["Credit Card Name"] || "");
-                    const network = getNetworkVariant(cardName);
-                    
-                    return (
-                      <div 
-                        key={`bms-${index}`} 
-                        className="offer-card"
-                      >
-                        {offer["Offer Image Link"] && (
-                          <img 
-                            src={offer["Offer Image Link"]} 
-                            alt={"BookMyShow Offer"} 
-                            className="offer-image"
-                          />
-                        )}
-                        
-                        {offer["Offer Description"] && <p><strong>Description:</strong> {offer["Offer Description"]}</p>}
-                        {offer["Validity of Offer"] && <p><strong>Validity:</strong> {offer["Validity of Offer"]}</p>}
-                        {network && (
-                          <p className="network-note">
-                            <strong>Note:</strong> This offer is applicable only on {network} variant
-                          </p>
-                        )}
-                        {offer["Offer Link"] && (
-                          <a 
-                            href={offer["Offer Link"]} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="offer-link"
-                          >
-                            <button className="view-details-btn">
-                              Click for more details
-                            </button>
-                          </a>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {selectedPaytmDistrictOffers.length > 0 && (
-              <div className="offer-container">
-                <h2>Offers on Paytm and District</h2>
-                <div className="offer-row">
-                  {selectedPaytmDistrictOffers.map((offer, index) => {
-                    const cardName = normalizeCardName(offer["Credit Card Name"] || "");
-                    const network = getNetworkVariant(cardName);
-                    
-                    return (
-                      <div 
-                        key={`paytm-${index}`} 
-                        className={`offer-card ${expandedOfferIndex.paytm === index ? 'expanded' : ''}`}
-                      >
-                        {offer["Offer Image Link"] && (
-                          <img 
-                            src={offer["Offer Image Link"]} 
-                            alt={"Paytm & District Offer"} 
-                            className="offer-image"
-                          />
-                        )}
-                        <h3>{offer["Offer title"] || "Paytm & District Offer"}</h3>
-                        {network && (
-                          <p className="network-note">
-                            <strong>Note:</strong> This offer is applicable only on {network} variant
-                          </p>
-                        )}
-                        {offer["Offer description"] && <p><strong>Description:</strong> {offer["Offer description"]}</p>}
-                        
-                        {offer["Promo code"] && (
-                          <div className="promo-code-container">
-                            <strong>Promo Code: </strong>
-                            <span className="promo-code">
-                              {offer["Promo code"]}
-                            </span>
-                            <div 
-                              onClick={() => copyToClipboard(offer["Promo code"])}
-                              className="copy-button"
-                              title="Copy to clipboard"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                              </svg>
-                            </div>
-                          </div>
-                        )}
-                        
-                        <button 
-                          onClick={() => toggleOfferDetails("paytm", index)}
-                          className={`details-btn ${expandedOfferIndex.paytm === index ? "active" : ""}`}
-                        >
-                          {expandedOfferIndex.paytm === index ? "Hide Terms & Conditions" : "Show Terms & Conditions"}
-                        </button>
-                        
-                        <div className={`terms-container ${expandedOfferIndex.paytm === index ? 'visible' : ''}`}>
-                          <div className="terms-content">
-                            <p>{offer["Offer details"]}</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                     
-                </div>
-                
-              </div>
-              
-            )}
-            
-          </div>
-          
-        )}
-     
       </div>
-       {selectedCard && !hasAnyOffers() && !showNoCardMessage ? null : (
-        <p className="bottom-disclaimer"> <h3>Disclaimer</h3> All offers, coupons, and discounts listed on our platform are provided for informational purposes only. We do not guarantee the accuracy, availability, or validity of any offer. Users are advised to verify the terms and conditions with the respective merchants before making any purchase. We are not responsible for any discrepancies, expired offers, or losses arising from the use of these coupons.</p>
-     )}
+    );
+  };
+
+  return (
+    <div className="App" style={{ fontFamily: "'Libre Baskerville', serif" }}>
+      {/* Search / dropdown */}
+      <div className="dropdown" style={{ position: "relative", width: "600px", margin: "20px auto" }}>
+        <input
+          type="text"
+          value={query}
+          onChange={onChangeQuery}
+          placeholder="Type a Credit or Debit Card...."
+          className="dropdown-input"
+          style={{
+            width: "100%",
+            padding: "12px",
+            fontSize: "16px",
+            border: `1px solid ${noMatches ? "#d32f2f" : "#ccc"}`,
+            borderRadius: "6px",
+          }}
+        />
+        {query.trim() && !!filteredCards.length && (
+          <ul
+            className="dropdown-list"
+            style={{
+              listStyle: "none",
+              padding: "10px",
+              margin: 0,
+              width: "100%",
+              maxHeight: "260px",
+              overflowY: "auto",
+              border: "1px solid #ccc",
+              borderRadius: "6px",
+              backgroundColor: "#fff",
+              position: "absolute",
+              zIndex: 1000,
+            }}
+          >
+            {filteredCards.map((item, idx) =>
+              item.type === "heading" ? (
+                <li key={`h-${idx}`} style={{ padding: "8px 10px", fontWeight: 700, background: "#fafafa" }}>
+                  {item.label}
+                </li>
+              ) : (
+                <li
+                  key={`i-${idx}-${item.display}`}
+                  onClick={() => onPick(item)}
+                  style={{
+                    padding: "10px",
+                    cursor: "pointer",
+                    borderBottom: "1px solid #f2f2f2",
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = "#f7f9ff")}
+                  onMouseOut={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  {item.display}
+                </li>
+              )
+            )}
+          </ul>
+        )}
+      </div>
+
+      {noMatches && query.trim() && (
+        <p style={{ color: "#d32f2f", textAlign: "center", marginTop: 8 }}>
+          No matching cards found. Please try a different name.
+        </p>
+      )}
+
+      {/* Offers by section */}
+      {selected && hasAny && !noMatches && (
+        <div className="offers-section" style={{ maxWidth: 1200, margin: "0 auto", padding: 20 }}>
+          {!!dBMS.length && (
+            <div className="offer-group">
+              <h2 style={{ textAlign: "center" }}>Offers on Bookmyshow</h2>
+              <div className="offer-grid">
+                {dBMS.map((w, i) => (
+                  <OfferCard key={`bms-${i}`} wrapper={w} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!!dCinepolis.length && (
+            <div className="offer-group">
+              <h2 style={{ textAlign: "center" }}>Offers on Cinepolis</h2>
+              <div className="offer-grid">
+                {dCinepolis.map((w, i) => (
+                  <OfferCard key={`cine-${i}`} wrapper={w} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!!dPaytmDistrict.length && (
+            <div className="offer-group">
+              <h2 style={{ textAlign: "center" }}>Offers on Paytm and District</h2>
+              <div className="offer-grid">
+                {dPaytmDistrict.map((w, i) => (
+                  <OfferCard key={`pd-${i}`} wrapper={w} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!!dPVR.length && (
+            <div className="offer-group">
+              <h2 style={{ textAlign: "center" }}>Offers on PVR</h2>
+              <div className="offer-grid">
+                {dPVR.map((w, i) => (
+                  <OfferCard key={`pvr-${i}`} wrapper={w} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!!dPermanent.length && (
+            <div className="offer-group">
+              <h2 style={{ textAlign: "center" }}>Permanent Offers</h2>
+              <div className="offer-grid">
+                {dPermanent.map((w, i) => (
+                  <OfferCard key={`perm-${i}`} wrapper={w} isPermanent />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {selected && !hasAny && !noMatches && (
+        <p style={{ color: "#d32f2f", textAlign: "center", marginTop: 10 }}>
+          No offer available for this card
+        </p>
+      )}
+
+      {selected && hasAny && !noMatches && (
+        <button
+          onClick={() => window.scrollBy({ top: window.innerHeight, behavior: "smooth" })}
+          style={{
+            position: "fixed",
+            right: 20,
+            bottom: isMobile ? 20 : 150,
+            padding: isMobile ? "12px 15px" : "10px 20px",
+            backgroundColor: "#1e7145",
+            color: "white",
+            border: "none",
+            borderRadius: isMobile ? "50%" : 8,
+            cursor: "pointer",
+            fontSize: 18,
+            zIndex: 1000,
+            boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
+            width: isMobile ? 50 : 140,
+            height: isMobile ? 50 : 50,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          {isMobile ? "↓" : "Scroll Down"}
+        </button>
+      )}
+
+      <Disclaimer />
     </div>
   );
 };
 
-export default CreditCardDropdown;
+export default HotelOffers;
