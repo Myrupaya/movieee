@@ -182,6 +182,10 @@ const HotelOffers = () => {
   const [creditEntries, setCreditEntries] = useState([]);
   const [debitEntries, setDebitEntries] = useState([]);
 
+  // marquee lists (from offer CSVs ONLY — NOT all_cards.csv)
+  const [marqueeCC, setMarqueeCC] = useState([]);
+  const [marqueeDC, setMarqueeDC] = useState([]);
+
   // ui state
   const [filteredCards, setFilteredCards] = useState([]);
   const [query, setQuery] = useState("");
@@ -286,6 +290,48 @@ const HotelOffers = () => {
     loadOffers();
   }, []);
 
+  /** Build marquee lists from OFFER CSVs (exclude allCards.csv) */
+  useEffect(() => {
+    const ccMap = new Map(); // baseNorm -> display
+    const dcMap = new Map();
+
+    const harvestList = (val, targetMap) => {
+      for (const raw of splitList(val)) {
+        const base = brandCanonicalize(getBase(raw)); // strips "(Variant)"
+        const baseNorm = toNorm(base);
+        if (baseNorm) targetMap.set(baseNorm, targetMap.get(baseNorm) || base);
+      }
+    };
+
+    const harvestRows = (rows) => {
+      for (const o of rows || []) {
+        const ccField = firstField(o, LIST_FIELDS.credit);
+        if (ccField) harvestList(ccField, ccMap);
+
+        const dcField = firstField(o, LIST_FIELDS.debit);
+        if (dcField) harvestList(dcField, dcMap);
+      }
+    };
+
+    harvestRows(bmsOffers);
+    harvestRows(cinepolisOffers);
+    harvestRows(paytmDistrictOffers);
+    harvestRows(pvrOffers);
+
+    // Permanent offers: treat "Credit Card Name" as CC
+    for (const o of permanentOffers || []) {
+      const nm = firstField(o, LIST_FIELDS.permanentCCName);
+      if (nm) {
+        const base = brandCanonicalize(getBase(nm));
+        const baseNorm = toNorm(base);
+        if (baseNorm) ccMap.set(baseNorm, ccMap.get(baseNorm) || base);
+      }
+    }
+
+    setMarqueeCC(Array.from(ccMap.values()).sort((a, b) => a.localeCompare(b)));
+    setMarqueeDC(Array.from(dcMap.values()).sort((a, b) => a.localeCompare(b)));
+  }, [bmsOffers, cinepolisOffers, paytmDistrictOffers, pvrOffers, permanentOffers]);
+
   /** search box */
   const onChangeQuery = (e) => {
     const val = e.target.value;
@@ -333,6 +379,16 @@ const HotelOffers = () => {
   const onPick = (entry) => {
     setSelected(entry);
     setQuery(entry.display);
+    setFilteredCards([]);
+    setNoMatches(false);
+  };
+
+  // Click a chip → set the dropdown + selected entry
+  const handleChipClick = (name, type) => {
+    const display = brandCanonicalize(getBase(name));
+    const baseNorm = toNorm(display);
+    setQuery(display);
+    setSelected({ type, display, baseNorm });
     setFilteredCards([]);
     setNoMatches(false);
   };
@@ -392,11 +448,7 @@ const HotelOffers = () => {
     dPVR.length
   );
 
-  /** Offer card UI
-   *  - Shows only image, description, and button
-   *  - Variant note (when present and site is in VARIANT_NOTE_SITES)
-   *  - Scrollable T&C-style description for Bookmyshow, Cinepolis, Paytm and District, PVR
-   */
+  /** Offer card UI */
   const OfferCard = ({ wrapper, isPermanent = false }) => {
     const o = wrapper.offer;
     const image = firstField(o, LIST_FIELDS.image);
@@ -458,13 +510,111 @@ const HotelOffers = () => {
 
   return (
     <div className="App" style={{ fontFamily: "'Libre Baskerville', serif" }}>
+
+      {/* 🔹 Cards-with-offers strip container */}
+      {(marqueeCC.length > 0 || marqueeDC.length > 0) && (
+        <div
+          style={{
+            maxWidth: 1200,
+            margin: "14px auto 0",
+            padding: "14px 16px",
+            background: "#F7F9FC",            // matches light paper tone used elsewhere
+            border: "1px solid #E8EDF3",
+            borderRadius: 10,
+            boxShadow: "0 6px 18px rgba(15,23,42,.06)",
+          }}
+        >
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: 16,
+              color: "#1F2D45",
+              marginBottom: 10,
+              display: "flex",
+              justifyContent:"center",
+              gap: 8,
+            }}
+          >
+            <span>Credit and Debit cards which has offers</span>
+          </div>
+
+          {/* CC marquee chips */}
+          {marqueeCC.length > 0 && (
+            <marquee direction="left" scrollAmount="4" style={{ marginBottom: 8, whiteSpace: "nowrap" }}>
+              <strong style={{ marginRight: 10, color: "#1F2D45" }}>Credit Cards:</strong>
+              {marqueeCC.map((name, idx) => (
+                <span
+                  key={`cc-chip-${idx}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleChipClick(name, "credit")}
+                  onKeyDown={(e) => (e.key === "Enter" ? handleChipClick(name, "credit") : null)}
+                  style={{
+                    display: "inline-block",
+                    padding: "6px 10px",
+                    border: "1px solid #E0E6EE",
+                    borderRadius: 9999,
+                    marginRight: 8,
+                    background: "#fff",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                    cursor: "pointer",
+                    fontSize: 14,
+                    lineHeight: 1.2,
+                    userSelect: "none",
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = "#F0F5FF")}
+                  onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
+                  title="Click to select this card"
+                >
+                  {name}
+                </span>
+              ))}
+            </marquee>
+          )}
+
+          {/* DC marquee chips */}
+          {marqueeDC.length > 0 && (
+            <marquee direction="left" scrollAmount="4" style={{ whiteSpace: "nowrap" }}>
+              <strong style={{ marginRight: 10, color: "#1F2D45" }}>Debit Cards:</strong>
+              {marqueeDC.map((name, idx) => (
+                <span
+                  key={`dc-chip-${idx}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleChipClick(name, "debit")}
+                  onKeyDown={(e) => (e.key === "Enter" ? handleChipClick(name, "debit") : null)}
+                  style={{
+                    display: "inline-block",
+                    padding: "6px 10px",
+                    border: "1px solid #E0E6EE",
+                    borderRadius: 9999,
+                    marginRight: 8,
+                    background: "#fff",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                    cursor: "pointer",
+                    fontSize: 14,
+                    lineHeight: 1.2,
+                    userSelect: "none",
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = "#F0F5FF")}
+                  onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
+                  title="Click to select this card"
+                >
+                  {name}
+                </span>
+              ))}
+            </marquee>
+          )}
+        </div>
+      )}
+
       {/* Search / dropdown */}
       <div className="dropdown" style={{ position: "relative", width: "600px", margin: "20px auto" }}>
         <input
           type="text"
           value={query}
           onChange={onChangeQuery}
-          placeholder="Type a Credit or Debit Card...."
+          placeholder="Type a Credit or Debit Card to check the offers...."
           className="dropdown-input"
           style={{
             width: "100%",
