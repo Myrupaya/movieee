@@ -535,7 +535,7 @@ const HotelOffers = () => {
               gap: 8,
             }}
           >
-            <span>Credit and Debit cards which has offers</span>
+            <span>Credit And Debit Cards Which Have Offers</span>
           </div>
 
           {/* CC marquee chips */}
