@@ -270,7 +270,7 @@ const HotelOffers = () => {
       try {
         const files = [
           { name: "bookmyshow.csv", setter: setBMSOffers },
-          { name: "cienpolis.csv", setter: setCinepolisOffers },
+          { name: "cinepolis.csv", setter: setCinepolisOffers },
           { name: "district_paytm.csv", setter: setPaytmDistrictOffers },
           { name: "pvr.csv", setter: setPVROffers },
           { name: "permanent_offers.csv", setter: setPermanentOffers },
@@ -397,7 +397,7 @@ const HotelOffers = () => {
   function matchesFor(offers, type, site) {
     if (!selected) return [];
     const out = [];
-    for (const o of offers || []) {
+      for (const o of offers || []) {
       let list = [];
       if (type === "permanent") {
         const nm = firstField(o, LIST_FIELDS.permanentCCName);
@@ -448,16 +448,23 @@ const HotelOffers = () => {
     dPVR.length
   );
 
-  /** Offer card UI */
+  /** Offer card UI — hooks at top (no conditional hooks) */
   const OfferCard = ({ wrapper, isPermanent = false }) => {
+    const [copied, setCopied] = useState(false); // used for Paytm & District only, safe at top
+
     const o = wrapper.offer;
-    const image = firstField(o, LIST_FIELDS.image);
-    const link = firstField(o, LIST_FIELDS.link);
 
-    const desc = isPermanent
-      ? firstField(o, LIST_FIELDS.permanentBenefit)
-      : firstField(o, LIST_FIELDS.desc);
+    // case-insensitive getter for exact column names you specified
+    const getCI = (obj, key) => {
+      if (!obj) return undefined;
+      const target = String(key).toLowerCase();
+      for (const k of Object.keys(obj)) {
+        if (String(k).toLowerCase() === target) return obj[k];
+      }
+      return undefined;
+    };
 
+    const siteKey = String(wrapper.site || "").toLowerCase();
     const showVariantNote =
       VARIANT_NOTE_SITES.has(wrapper.site) &&
       wrapper.variantText &&
@@ -465,10 +472,132 @@ const HotelOffers = () => {
 
     const useScroll = SCROLL_SITES.has(wrapper.site);
 
+    // Defaults (kept for other/legacy sites & permanent)
+    let image = firstField(o, LIST_FIELDS.image);
+    let title = isPermanent
+      ? undefined
+      : firstField(o, LIST_FIELDS.title) || o.Website;
+    let desc = isPermanent
+      ? firstField(o, LIST_FIELDS.permanentBenefit)
+      : firstField(o, LIST_FIELDS.desc);
+    let link = firstField(o, LIST_FIELDS.link);
+
+    // Extra fields for specified sites
+    let couponCode;
+    let terms;
+
+    // Apply your strict per-site fields
+    if (siteKey === "bookmyshow" || siteKey === "cinepolis") {
+      // fields: Offer, Offer Description, Images, Link
+      title = getCI(o, "Offer") ?? title;
+      desc  = getCI(o, "Offer Description") ?? desc;
+      image = getCI(o, "Images") ?? image;
+      link  = getCI(o, "Link") ?? link;
+    } else if (siteKey === "paytm and district") {
+      // fields: Coupon Code, Terms and conditions
+      couponCode = getCI(o, "Coupon Code");
+      terms      = getCI(o, "Terms and conditions");
+    } else if (siteKey === "pvr") {
+      // fields: Offer, Terms and conditions, Link, Image
+      title = getCI(o, "Offer") ?? title;
+      terms = getCI(o, "Terms and conditions");
+      link  = getCI(o, "Link") ?? link;
+      image = getCI(o, "Image") ?? image;
+      if (terms) desc = terms; // show T&C as the description area (scrollable)
+    }
+
+    const onCopy = () => {
+      if (!couponCode) return;
+      navigator.clipboard?.writeText(String(couponCode)).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
+      });
+    };
+
+    // Special rendering for Paytm & District (coupon + scrollable T&C)
+    if (siteKey === "paytm and district") {
+      return (
+        <div className="offer-card">
+          <div className="offer-info">
+            {couponCode && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 10,
+                }}
+              >
+                <span
+                  style={{
+                    padding: "6px 10px",
+                    border: "1px dashed #9aa4b2",
+                    borderRadius: 6,
+                    background: "#f7f9ff",
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {couponCode}
+                </span>
+                <button
+                  className="btn"
+                  onClick={onCopy}
+                  aria-label="Copy coupon code"
+                  title="Copy coupon code"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                >
+                  <span role="img" aria-hidden="true">📋</span> Copy
+                </button>
+                {copied && (
+                  <span style={{ color: "#1e7145", fontSize: 14 }}>Copied!</span>
+                )}
+              </div>
+            )}
+
+            {terms && (
+              <div
+                className="offer-desc"
+                style={{
+                  maxHeight: 140,   // T&C style scroll area
+                  overflowY: "auto",
+                  paddingRight: 8,
+                  border: "1px solid #eee",
+                  borderRadius: 6,
+                  padding: "10px 12px",
+                  background: "#fafafa",
+                  lineHeight: 1.5,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {terms}
+              </div>
+            )}
+
+            {showVariantNote && (
+              <p className="network-note" style={{ color: "#b00020", marginTop: 8 }}>
+                <strong>Note:</strong> This benefit is applicable only on <em>{wrapper.variantText}</em> variant
+              </p>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Default rendering (BookMyShow, Cinepolis, PVR, Permanent, others)
     return (
       <div className="offer-card">
         {image && <img src={image} alt="Offer" />}
         <div className="offer-info">
+          {/* Show the “offer” (title) when we have it */}
+          {title && (
+            <div
+              className="offer-title"
+              style={{ fontWeight: 700, marginBottom: 8, fontSize: 16 }}
+            >
+              {title}
+            </div>
+          )}
+
           {desc && (
             <div
               className="offer-desc"
@@ -490,6 +619,13 @@ const HotelOffers = () => {
             >
               {desc}
             </div>
+          )}
+
+          {/* ➕ Permanent-note line */}
+          {isPermanent && (
+            <p className="inbuilt-note" style={{ marginTop: 8 }}>
+              <strong>This is a inbuilt feature of this credit card</strong>
+            </p>
           )}
 
           {showVariantNote && (
@@ -518,7 +654,7 @@ const HotelOffers = () => {
             maxWidth: 1200,
             margin: "14px auto 0",
             padding: "14px 16px",
-            background: "#F7F9FC",            // matches light paper tone used elsewhere
+            background: "#F7F9FC",
             border: "1px solid #E8EDF3",
             borderRadius: 10,
             boxShadow: "0 6px 18px rgba(15,23,42,.06)",
