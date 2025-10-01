@@ -52,8 +52,14 @@ const toNorm = (s) =>
     .replace(/\s+/g, " ")
     .trim();
 
-/** Normalize header keys aggressively (trim, strip BOM, lowercase, collapse symbols) */
+/** Trim BOM + NBSP + spaces */
 const cleanKey = (s) => String(s || "").replace(/^\uFEFF/, "").trim();
+const cleanCell = (s) =>
+  String(s ?? "")
+    .replace(/^\uFEFF/, "")
+    .replace(/\u00A0/g, " ")
+    .trim();
+
 const normKey = (s) =>
   cleanKey(s)
     .toLowerCase()
@@ -63,7 +69,6 @@ const normKey = (s) =>
 
 /** Find a column in obj that matches any of the wanted keys (case/space/BOM-insensitive).
  *  If no exact normalized match, fall back to any column containing the word "debit" or "credit"
- *  depending on the wanted keys. Returns the ORIGINAL key string or undefined.
  */
 function findKey(obj, wantedKeys) {
   if (!obj) return undefined;
@@ -78,11 +83,7 @@ function findKey(obj, wantedKeys) {
   for (const w of wantedNorms) {
     if (rowMap.has(w)) {
       const match = rowMap.get(w);
-      if (obj[match] !== undefined && String(obj[match]).trim() !== "") {
-        return match;
-      }
-      // if empty value, still return match so caller can decide; but keep robust: return even if empty
-      return match;
+      return match; // return even if empty; caller will decide
     }
   }
 
@@ -112,8 +113,9 @@ function firstField(obj, keys) {
 }
 
 function splitList(val) {
-  if (!val) return [];
-  return String(val)
+  const v = cleanCell(val);
+  if (!v) return [];
+  return v
     .replace(/\n/g, " ")
     .split(",")
     .map((s) => s.trim())
@@ -370,6 +372,14 @@ const HotelOffers = () => {
     const ccMap = new Map(); // baseNorm -> display
     const dcMap = new Map();
 
+    // track which headers matched in each file
+    const matchedCreditKeys = { BMS: new Set(), CINE: new Set(), PAYTM: new Set(), PVR: new Set() };
+    const matchedDebitKeys  = { BMS: new Set(), CINE: new Set(), PAYTM: new Set(), PVR: new Set() };
+
+    // sample harvested values for visibility
+    const dcSamples = { BMS: [], CINE: [], PAYTM: [], PVR: [] };
+    const ccSamples = { BMS: [], CINE: [], PAYTM: [], PVR: [] };
+
     const counters = {
       BMS: { creditRowsWithField: 0, debitRowsWithField: 0, rows: bmsOffers.length },
       CINE: { creditRowsWithField: 0, debitRowsWithField: 0, rows: cinepolisOffers.length },
@@ -378,11 +388,14 @@ const HotelOffers = () => {
       PERM: { ccNameRows: 0, rows: permanentOffers.length },
     };
 
-    const harvestList = (val, targetMap) => {
+    const harvestList = (val, targetMap, sampleArr) => {
       for (const raw of splitList(val)) {
         const base = brandCanonicalize(getBase(raw)); // strips "(Variant)"
         const baseNorm = toNorm(base);
-        if (baseNorm) targetMap.set(baseNorm, targetMap.get(baseNorm) || base);
+        if (baseNorm) {
+          targetMap.set(baseNorm, targetMap.get(baseNorm) || base);
+          if (sampleArr && sampleArr.length < 5) sampleArr.push(base);
+        }
       }
     };
 
@@ -393,11 +406,13 @@ const HotelOffers = () => {
 
         if (ccKey) {
           counters[tag].creditRowsWithField++;
-          harvestList(o[ccKey], ccMap);
+          matchedCreditKeys[tag].add(ccKey);
+          harvestList(o[ccKey], ccMap, ccSamples[tag]);
         }
         if (dcKey) {
           counters[tag].debitRowsWithField++;
-          harvestList(o[dcKey], dcMap);
+          matchedDebitKeys[tag].add(dcKey);
+          harvestList(o[dcKey], dcMap, dcSamples[tag]);
         }
         if (!ccKey && !dcKey) {
           dbg(`${tag}: row had no CC/DC fields. Keys:`, Object.keys(o));
@@ -414,8 +429,9 @@ const HotelOffers = () => {
     for (const o of permanentOffers || []) {
       const keyUsed = findKey(o, LIST_FIELDS.permanentCCName);
       if (keyUsed) {
-        const nm = o[keyUsed];
-        if (String(nm || "").trim()) {
+        const nmRaw = o[keyUsed];
+        const nm = cleanCell(nmRaw);
+        if (nm) {
           counters.PERM.ccNameRows++;
           const base = brandCanonicalize(getBase(nm));
           const baseNorm = toNorm(base);
@@ -435,6 +451,20 @@ const HotelOffers = () => {
 
     dbg("Marquee build", {
       counters,
+      matchedCreditKeys: {
+        BMS: Array.from(matchedCreditKeys.BMS),
+        CINE: Array.from(matchedCreditKeys.CINE),
+        PAYTM: Array.from(matchedCreditKeys.PAYTM),
+        PVR: Array.from(matchedCreditKeys.PVR),
+      },
+      matchedDebitKeys: {
+        BMS: Array.from(matchedDebitKeys.BMS),
+        CINE: Array.from(matchedDebitKeys.CINE),
+        PAYTM: Array.from(matchedDebitKeys.PAYTM),
+        PVR: Array.from(matchedDebitKeys.PVR),
+      },
+      ccSamples,
+      dcSamples,
       marqueeCCCount: ccList.length,
       marqueeDCCount: dcList.length,
       marqueeCCSample: ccList.slice(0, 10),
