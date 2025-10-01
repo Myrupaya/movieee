@@ -16,7 +16,7 @@ const LIST_FIELDS = {
   credit: ["Eligible Credit Cards", "Eligible Cards"],
   debit: ["Eligible Debit Cards", "Applicable Debit Cards"],
   title: ["Offer Title", "Title"],
-  image: ["Image", "Credit Card Image", "Offer Image", "image", "Image URL"],
+  image: ["Image", "Credit Card Image", "Offer Image", "image", "Image URL"], // ✅ added "Image URL"
   link: ["Link", "Offer Link"],
   desc: ["Description", "Details", "Offer Description", "Flight Benefit"],
   // Permanent (inbuilt) CSV fields
@@ -236,7 +236,7 @@ const HotelOffers = () => {
   const [creditEntries, setCreditEntries] = useState([]);
   const [debitEntries, setDebitEntries] = useState([]);
 
-  // marquee lists (from offer CSVs ONLY — NOT all_cards.csv)
+  // marquee lists (from offer CSVs; fallback to allCards if empty)
   const [marqueeCC, setMarqueeCC] = useState([]);
   const [marqueeDC, setMarqueeDC] = useState([]);
 
@@ -367,7 +367,7 @@ const HotelOffers = () => {
     loadOffers();
   }, []);
 
-  /** Build marquee lists from OFFER CSVs (exclude allCards.csv) */
+  /** Build marquee lists from OFFER CSVs (exclude allCards.csv); fallback to allCards if empty */
   useEffect(() => {
     const ccMap = new Map(); // baseNorm -> display
     const dcMap = new Map();
@@ -460,8 +460,24 @@ const HotelOffers = () => {
       }
     }
 
-    const ccList = Array.from(ccMap.values()).sort((a, b) => a.localeCompare(b));
-    const dcList = Array.from(dcMap.values()).sort((a, b) => a.localeCompare(b));
+    // Build lists from the harvested maps
+    let ccList = Array.from(ccMap.values()).sort((a, b) => a.localeCompare(b));
+    let dcList = Array.from(dcMap.values()).sort((a, b) => a.localeCompare(b));
+
+    // 🔁 Fallbacks: if nothing harvested from offer CSVs, use allCards lists
+    if (dcList.length === 0 && debitEntries.length > 0) {
+      dcList = debitEntries.map((e) => e.display);
+      dbg("Marquee DC fallback → using allCards debit list", {
+        debitEntriesCount: debitEntries.length,
+      });
+    }
+    if (ccList.length === 0 && creditEntries.length > 0) {
+      ccList = creditEntries.map((e) => e.display);
+      dbg("Marquee CC fallback → using allCards credit list", {
+        creditEntriesCount: creditEntries.length,
+      });
+    }
+
     setMarqueeCC(ccList);
     setMarqueeDC(dcList);
 
@@ -489,7 +505,15 @@ const HotelOffers = () => {
       marqueeDCSample: dcList.slice(0, 10),
       LIST_FIELDS_debit: LIST_FIELDS.debit,
     });
-  }, [bmsOffers, cinepolisOffers, paytmDistrictOffers, pvrOffers, permanentOffers]);
+  }, [
+    bmsOffers,
+    cinepolisOffers,
+    paytmDistrictOffers,
+    pvrOffers,
+    permanentOffers,
+    creditEntries,   // ✅ include dropdown lists for fallback
+    debitEntries,    // ✅ include dropdown lists for fallback
+  ]);
 
   /** search box */
   const onChangeQuery = (e) => {
