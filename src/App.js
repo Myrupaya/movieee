@@ -16,7 +16,7 @@ const LIST_FIELDS = {
   credit: ["Eligible Credit Cards", "Eligible Cards"],
   debit: ["Eligible Debit Cards", "Applicable Debit Cards"],
   title: ["Offer Title", "Title"],
-  image: ["Image", "Credit Card Image", "Offer Image", "image", "Image URL"], // ✅ added "Image URL"
+  image: ["Image", "Credit Card Image", "Offer Image", "image", "Image URL"],
   link: ["Link", "Offer Link"],
   desc: ["Description", "Details", "Offer Description", "Flight Benefit"],
   // Permanent (inbuilt) CSV fields
@@ -112,12 +112,12 @@ function firstField(obj, keys) {
   return key !== undefined ? obj[key] : undefined;
 }
 
+/** Split helper that handles commas, slashes, semicolons, pipes, “and”, “&”, bullets, and newlines */
 function splitList(val) {
   const v = cleanCell(val);
   if (!v) return [];
   return v
-    .replace(/\n/g, " ")
-    .split(",")
+    .split(/\r?\n|[,;|/]|(?:\s+and\s+)|&|•/gi)
     .map((s) => s.trim())
     .filter(Boolean);
 }
@@ -380,17 +380,33 @@ const HotelOffers = () => {
     const dcSamples = { BMS: [], CINE: [], PAYTM: [], PVR: [] };
     const ccSamples = { BMS: [], CINE: [], PAYTM: [], PVR: [] };
 
+    // raw cell samples (first 3 per file) to debug why split produced zero items
+    const rawDebitSampleValues  = { BMS: [], CINE: [], PAYTM: [], PVR: [] };
+    const rawCreditSampleValues = { BMS: [], CINE: [], PAYTM: [], PVR: [] };
+
     const counters = {
-      BMS: { creditRowsWithField: 0, debitRowsWithField: 0, rows: bmsOffers.length },
-      CINE: { creditRowsWithField: 0, debitRowsWithField: 0, rows: cinepolisOffers.length },
-      PAYTM: { creditRowsWithField: 0, debitRowsWithField: 0, rows: paytmDistrictOffers.length },
-      PVR: { creditRowsWithField: 0, debitRowsWithField: 0, rows: pvrOffers.length },
+      BMS: { creditRowsWithField: 0, debitRowsWithField: 0, rows: bmsOffers.length, nonEmptyDebitZeroSplit: 0, nonEmptyCreditZeroSplit: 0 },
+      CINE: { creditRowsWithField: 0, debitRowsWithField: 0, rows: cinepolisOffers.length, nonEmptyDebitZeroSplit: 0, nonEmptyCreditZeroSplit: 0 },
+      PAYTM: { creditRowsWithField: 0, debitRowsWithField: 0, rows: paytmDistrictOffers.length, nonEmptyDebitZeroSplit: 0, nonEmptyCreditZeroSplit: 0 },
+      PVR: { creditRowsWithField: 0, debitRowsWithField: 0, rows: pvrOffers.length, nonEmptyDebitZeroSplit: 0, nonEmptyCreditZeroSplit: 0 },
       PERM: { ccNameRows: 0, rows: permanentOffers.length },
     };
 
-    const harvestList = (val, targetMap, sampleArr) => {
-      for (const raw of splitList(val)) {
-        const base = brandCanonicalize(getBase(raw)); // strips "(Variant)"
+    const harvestList = (val, targetMap, sampleArr, tag, kind) => {
+      const raw = cleanCell(val);
+      if (raw && (rawDebitSampleValues[tag] || rawCreditSampleValues[tag])) {
+        if (kind === "debit" && rawDebitSampleValues[tag].length < 3) rawDebitSampleValues[tag].push(raw);
+        if (kind === "credit" && rawCreditSampleValues[tag].length < 3) rawCreditSampleValues[tag].push(raw);
+      }
+
+      const list = splitList(raw);
+      if (raw && list.length === 0) {
+        if (kind === "debit") counters[tag].nonEmptyDebitZeroSplit++;
+        if (kind === "credit") counters[tag].nonEmptyCreditZeroSplit++;
+      }
+
+      for (const item of list) {
+        const base = brandCanonicalize(getBase(item)); // strips "(Variant)"
         const baseNorm = toNorm(base);
         if (baseNorm) {
           targetMap.set(baseNorm, targetMap.get(baseNorm) || base);
@@ -407,12 +423,12 @@ const HotelOffers = () => {
         if (ccKey) {
           counters[tag].creditRowsWithField++;
           matchedCreditKeys[tag].add(ccKey);
-          harvestList(o[ccKey], ccMap, ccSamples[tag]);
+          harvestList(o[ccKey], ccMap, ccSamples[tag], tag, "credit");
         }
         if (dcKey) {
           counters[tag].debitRowsWithField++;
           matchedDebitKeys[tag].add(dcKey);
-          harvestList(o[dcKey], dcMap, dcSamples[tag]);
+          harvestList(o[dcKey], dcMap, dcSamples[tag], tag, "debit");
         }
         if (!ccKey && !dcKey) {
           dbg(`${tag}: row had no CC/DC fields. Keys:`, Object.keys(o));
@@ -463,6 +479,8 @@ const HotelOffers = () => {
         PAYTM: Array.from(matchedDebitKeys.PAYTM),
         PVR: Array.from(matchedDebitKeys.PVR),
       },
+      rawCreditSampleValues,
+      rawDebitSampleValues,
       ccSamples,
       dcSamples,
       marqueeCCCount: ccList.length,
