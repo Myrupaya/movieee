@@ -3,6 +3,14 @@ import axios from "axios";
 import Papa from "papaparse";
 import "./App.css";
 
+/** -------------------- DEBUG -------------------- */
+const DBG = true;
+const dbg = (...args) => {
+  if (DBG && typeof console !== "undefined") {
+    console.log("[HotelOffers]", ...args);
+  }
+};
+
 /** -------------------- CONFIG -------------------- */
 const LIST_FIELDS = {
   credit: ["Eligible Credit Cards", "Eligible Cards"],
@@ -212,21 +220,30 @@ const HotelOffers = () => {
   useEffect(() => {
     async function loadAllCards() {
       try {
+        dbg("Loading allCards.csv …");
         const res = await axios.get(`/allCards.csv`);
         const parsed = Papa.parse(res.data, { header: true });
         const rows = parsed.data || [];
+        const headers = Object.keys(rows?.[0] || {});
+        dbg("allCards.csv loaded", { rows: rows.length, headers });
+        dbg("LIST_FIELDS.credit", LIST_FIELDS.credit);
+        dbg("LIST_FIELDS.debit", LIST_FIELDS.debit);
 
         const creditMap = new Map();
         const debitMap = new Map();
 
         for (const row of rows) {
           const ccList = splitList(firstField(row, LIST_FIELDS.credit));
+          const dcList = splitList(firstField(row, LIST_FIELDS.debit));
+          if (!ccList.length && !dcList.length) {
+            // If nothing matched, log a sample row's keys to catch header mismatches
+            dbg("Row had no CC/DC fields match. Row keys:", Object.keys(row));
+          }
           for (const raw of ccList) {
             const base = brandCanonicalize(getBase(raw));
             const baseNorm = toNorm(base);
             if (baseNorm) creditMap.set(baseNorm, creditMap.get(baseNorm) || base);
           }
-          const dcList = splitList(firstField(row, LIST_FIELDS.debit));
           for (const raw of dcList) {
             const base = brandCanonicalize(getBase(raw));
             const baseNorm = toNorm(base);
@@ -241,6 +258,13 @@ const HotelOffers = () => {
           .sort((a, b) => a.localeCompare(b))
           .map((d) => makeEntry(d, "debit"));
 
+        dbg("Dropdown lists built", {
+          creditCount: credit.length,
+          debitCount: debit.length,
+          creditSample: credit.slice(0, 5),
+          debitSample: debit.slice(0, 5),
+        });
+
         setCreditEntries(credit);
         setDebitEntries(debit);
 
@@ -252,6 +276,7 @@ const HotelOffers = () => {
         ]);
 
         if (!credit.length && !debit.length) {
+          dbg("No credit or debit entries found in allCards.csv");
           setNoMatches(true);
           setSelected(null);
         }
@@ -269,18 +294,22 @@ const HotelOffers = () => {
     async function loadOffers() {
       try {
         const files = [
-          { name: "bookmyshow.csv", setter: setBMSOffers },
-          { name: "cinepolis.csv", setter: setCinepolisOffers },
-          { name: "district_paytm.csv", setter: setPaytmDistrictOffers },
-          { name: "pvr.csv", setter: setPVROffers },
-          { name: "permanent_offers.csv", setter: setPermanentOffers },
+          { name: "bookmyshow.csv", setter: setBMSOffers, key: "BMS" },
+          { name: "cinepolis.csv", setter: setCinepolisOffers, key: "CINE" },
+          { name: "district_paytm.csv", setter: setPaytmDistrictOffers, key: "PAYTM" },
+          { name: "pvr.csv", setter: setPVROffers, key: "PVR" },
+          { name: "permanent_offers.csv", setter: setPermanentOffers, key: "PERM" },
         ];
 
         await Promise.all(
           files.map(async (f) => {
+            dbg(`Loading ${f.name} …`);
             const res = await axios.get(`/${encodeURIComponent(f.name)}`);
             const parsed = Papa.parse(res.data, { header: true });
-            f.setter(parsed.data || []);
+            const rows = parsed.data || [];
+            const headers = Object.keys(rows?.[0] || {});
+            dbg(`${f.name} loaded`, { key: f.key, rows: rows.length, headers });
+            f.setter(rows);
           })
         );
       } catch (e) {
@@ -295,6 +324,14 @@ const HotelOffers = () => {
     const ccMap = new Map(); // baseNorm -> display
     const dcMap = new Map();
 
+    const counters = {
+      BMS: { creditRowsWithField: 0, debitRowsWithField: 0, rows: bmsOffers.length },
+      CINE: { creditRowsWithField: 0, debitRowsWithField: 0, rows: cinepolisOffers.length },
+      PAYTM: { creditRowsWithField: 0, debitRowsWithField: 0, rows: paytmDistrictOffers.length },
+      PVR: { creditRowsWithField: 0, debitRowsWithField: 0, rows: pvrOffers.length },
+      PERM: { ccNameRows: 0, rows: permanentOffers.length },
+    };
+
     const harvestList = (val, targetMap) => {
       for (const raw of splitList(val)) {
         const base = brandCanonicalize(getBase(raw)); // strips "(Variant)"
@@ -303,33 +340,56 @@ const HotelOffers = () => {
       }
     };
 
-    const harvestRows = (rows) => {
+    const harvestRows = (rows, tag) => {
       for (const o of rows || []) {
         const ccField = firstField(o, LIST_FIELDS.credit);
-        if (ccField) harvestList(ccField, ccMap);
-
+        if (ccField) {
+          counters[tag].creditRowsWithField++;
+          harvestList(ccField, ccMap);
+        }
         const dcField = firstField(o, LIST_FIELDS.debit);
-        if (dcField) harvestList(dcField, dcMap);
+        if (dcField) {
+          counters[tag].debitRowsWithField++;
+          harvestList(dcField, dcMap);
+        }
+        if (!ccField && !dcField) {
+          // Log a sample row's keys to diagnose header mismatches
+          dbg(`${tag}: row had no CC/DC fields. Keys:`, Object.keys(o));
+        }
       }
     };
 
-    harvestRows(bmsOffers);
-    harvestRows(cinepolisOffers);
-    harvestRows(paytmDistrictOffers);
-    harvestRows(pvrOffers);
+    harvestRows(bmsOffers, "BMS");
+    harvestRows(cinepolisOffers, "CINE");
+    harvestRows(paytmDistrictOffers, "PAYTM");
+    harvestRows(pvrOffers, "PVR");
 
     // Permanent offers: treat "Credit Card Name" as CC
     for (const o of permanentOffers || []) {
       const nm = firstField(o, LIST_FIELDS.permanentCCName);
       if (nm) {
+        counters.PERM.ccNameRows++;
         const base = brandCanonicalize(getBase(nm));
         const baseNorm = toNorm(base);
         if (baseNorm) ccMap.set(baseNorm, ccMap.get(baseNorm) || base);
+      } else {
+        dbg("PERM: row missing Credit Card Name. Keys:", Object.keys(o));
       }
     }
 
-    setMarqueeCC(Array.from(ccMap.values()).sort((a, b) => a.localeCompare(b)));
-    setMarqueeDC(Array.from(dcMap.values()).sort((a, b) => a.localeCompare(b)));
+    const ccList = Array.from(ccMap.values()).sort((a, b) => a.localeCompare(b));
+    const dcList = Array.from(dcMap.values()).sort((a, b) => a.localeCompare(b));
+    setMarqueeCC(ccList);
+    setMarqueeDC(dcList);
+
+    dbg("Marquee build", {
+      counters,
+      marqueeCCCount: ccList.length,
+      marqueeDCCount: dcList.length,
+      marqueeCCSample: ccList.slice(0, 10),
+      marqueeDCSample: dcList.slice(0, 10),
+      LIST_FIELDS_debit: LIST_FIELDS.debit,
+    });
   }, [bmsOffers, cinepolisOffers, paytmDistrictOffers, pvrOffers, permanentOffers]);
 
   /** search box */
@@ -360,6 +420,13 @@ const HotelOffers = () => {
     const cc = scored(creditEntries);
     const dc = scored(debitEntries);
 
+    dbg("Search", {
+      query: val,
+      results: { cc: cc.length, dc: dc.length },
+      ccSample: cc.slice(0, 3),
+      dcSample: dc.slice(0, 3),
+    });
+
     if (!cc.length && !dc.length) {
       setNoMatches(true);
       setSelected(null);
@@ -377,6 +444,7 @@ const HotelOffers = () => {
   };
 
   const onPick = (entry) => {
+    dbg("Picked entry", entry);
     setSelected(entry);
     setQuery(entry.display);
     setFilteredCards([]);
@@ -387,8 +455,10 @@ const HotelOffers = () => {
   const handleChipClick = (name, type) => {
     const display = brandCanonicalize(getBase(name));
     const baseNorm = toNorm(display);
+    const entry = { type, display, baseNorm };
+    dbg("Chip click → selecting", entry);
     setQuery(display);
-    setSelected({ type, display, baseNorm });
+    setSelected(entry);
     setFilteredCards([]);
     setNoMatches(false);
   };
@@ -397,7 +467,10 @@ const HotelOffers = () => {
   function matchesFor(offers, type, site) {
     if (!selected) return [];
     const out = [];
-      for (const o of offers || []) {
+    let total = 0, hit = 0;
+
+    for (const o of offers || []) {
+      total++;
       let list = [];
       if (type === "permanent") {
         const nm = firstField(o, LIST_FIELDS.permanentCCName);
@@ -420,9 +493,12 @@ const HotelOffers = () => {
         }
       }
       if (matched) {
+        hit++;
         out.push({ offer: o, site, variantText: matchedVariant });
       }
     }
+
+    dbg("matchesFor", { site, type, totalRows: total, matchedRows: hit, selected: selected?.display });
     return out;
   }
 
@@ -447,6 +523,16 @@ const HotelOffers = () => {
     dPaytmDistrict.length ||
     dPVR.length
   );
+  dbg("Offer presence", {
+    hasAny,
+    counts: {
+      permanent: dPermanent.length,
+      bms: dBMS.length,
+      cinepolis: dCinepolis.length,
+      paytm: dPaytmDistrict.length,
+      pvr: dPVR.length,
+    }
+  });
 
   /** Offer card UI — hooks at top (no conditional hooks) */
   const OfferCard = ({ wrapper, isPermanent = false }) => {
@@ -505,6 +591,20 @@ const HotelOffers = () => {
       image = getCI(o, "Image") ?? image;
       if (terms) desc = terms; // show T&C as the description area (scrollable)
     }
+
+    // One-time per-card debug
+    dbg("OfferCard render", {
+      site: wrapper.site,
+      isPermanent,
+      have: {
+        image: !!image,
+        title: !!title,
+        desc: !!desc,
+        link: !!link,
+        couponCode: !!couponCode,
+        terms: !!terms,
+      },
+    });
 
     const onCopy = () => {
       if (!couponCode) return;
