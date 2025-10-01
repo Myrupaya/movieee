@@ -8,7 +8,7 @@ const LIST_FIELDS = {
   credit: ["Eligible Credit Cards", "Eligible Cards"],
   debit: ["Eligible Debit Cards", "Applicable Debit Cards"],
   title: ["Offer Title", "Title"],
-  image: ["Image", "Credit Card Image", "Offer Image", "image", "Image URL"],
+  image: ["Image", "Credit Card Image", "Offer Image", "image", "Image URL"], // ✅ robust image support
   link: ["Link", "Offer Link"],
   desc: ["Description", "Details", "Offer Description", "Flight Benefit"],
   // Permanent (inbuilt) CSV fields
@@ -60,6 +60,21 @@ function firstFieldByContains(obj, substr) {
   return undefined;
 }
 
+/** Return all {key, value} where the key matches regex and value is non-empty */
+function entriesByRegex(obj, keyRegex) {
+  if (!obj) return [];
+  const out = [];
+  for (const k of Object.keys(obj)) {
+    if (keyRegex.test(String(k))) {
+      const v = obj[k];
+      if (v !== undefined && v !== null && String(v).trim() !== "") {
+        out.push({ key: k, value: v });
+      }
+    }
+  }
+  return out;
+}
+
 function splitList(val) {
   if (!val) return [];
   return String(val)
@@ -100,8 +115,7 @@ function brandCanonicalize(text) {
 function lev(a, b) {
   a = toNorm(a);
   b = toNorm(b);
-  const n = a.length,
-    m = b.length;
+  const n = a.length, m = b.length;
   if (!n) return m;
   if (!m) return n;
   const d = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
@@ -171,10 +185,10 @@ const Disclaimer = () => (
   <section className="disclaimer">
     <h3>Disclaimer</h3>
     <p>
-      All offers, coupons, and discounts listed on our platform are provided for informational purposes only. We do not
-      guarantee the accuracy, availability, or validity of any offer. Users are advised to verify the terms and
-      conditions with the respective merchants before making any purchase. We are not responsible for any discrepancies,
-      expired offers, or losses arising from the use of these coupons.
+      All offers, coupons, and discounts listed on our platform are provided for informational purposes only.
+      We do not guarantee the accuracy, availability, or validity of any offer. Users are advised to verify the
+      terms and conditions with the respective merchants before making any purchase. We are not responsible for any
+      discrepancies, expired offers, or losses arising from the use of these coupons.
     </p>
   </section>
 );
@@ -197,11 +211,11 @@ const HotelOffers = () => {
   const [isMobile, setIsMobile] = useState(false);
 
   // offers (only these four + permanent)
-  const [bmsOffers, setBMSOffers] = useState([]); // BookMyShow
-  const [cinepolisOffers, setCinepolisOffers] = useState([]); // Cinepolis
+  const [bmsOffers, setBMSOffers] = useState([]);                   // BookMyShow
+  const [cinepolisOffers, setCinepolisOffers] = useState([]);       // Cinepolis
   const [paytmDistrictOffers, setPaytmDistrictOffers] = useState([]); // Paytm & District
-  const [pvrOffers, setPVROffers] = useState([]); // PVR
-  const [permanentOffers, setPermanentOffers] = useState([]); // Permanent
+  const [pvrOffers, setPVROffers] = useState([]);                   // PVR
+  const [permanentOffers, setPermanentOffers] = useState([]);       // Permanent
 
   // responsive
   useEffect(() => {
@@ -315,56 +329,124 @@ const HotelOffers = () => {
     })();
   }, []);
 
-  /** Build marquee lists from OFFER CSVs (exclude allCards.csv) — NO FALLBACKS */
+  /** Build marquee lists from OFFER CSVs (exclude allCards.csv) — smarter DC harvesting */
   useEffect(() => {
     const ccMap = new Map(); // baseNorm -> display
     const dcMap = new Map();
 
-    const matchedCreditKeys = { BMS: [], CINE: [], PAYTM: [], PVR: [] };
-    const matchedDebitKeys = { BMS: [], CINE: [], PAYTM: [], PVR: [] };
-
     const counters = {
-      BMS: { cc: 0, dc: 0 },
-      CINE: { cc: 0, dc: 0 },
-      PAYTM: { cc: 0, dc: 0 },
-      PVR: { cc: 0, dc: 0 },
+      BMS: { cc: 0, dc: 0, mixed: 0 },
+      CINE: { cc: 0, dc: 0, mixed: 0 },
+      PAYTM: { cc: 0, dc: 0, mixed: 0 },
+      PVR: { cc: 0, dc: 0, mixed: 0 },
       PERM: { cc: 0 },
     };
 
-    const harvestList = (val, targetMap) => {
+    const harvestList = (val, targetMap, tag, key) => {
       for (const raw of splitList(val)) {
         const base = brandCanonicalize(getBase(raw));
         const baseNorm = toNorm(base);
-        if (baseNorm) targetMap.set(baseNorm, targetMap.get(baseNorm) || base);
+        if (baseNorm) {
+          if (!targetMap.has(baseNorm)) {
+            console.debug(`[HotelOffers] ${tag}: + ${base}  (from: "${key}")`);
+          }
+          targetMap.set(baseNorm, targetMap.get(baseNorm) || base);
+        }
       }
+    };
+
+    // classify a list of names into CC/DC by presence of "credit"/"debit" in the name
+    const harvestMixed = (val, tag, key) => {
+      let cc = 0, dc = 0;
+      for (const raw of splitList(val)) {
+        const base = brandCanonicalize(getBase(raw));
+        const baseNorm = toNorm(base);
+        const lower = String(raw).toLowerCase();
+        if (!baseNorm) continue;
+        if (/\bdebit\b/.test(lower)) {
+          if (!dcMap.has(baseNorm)) {
+            console.debug(`[HotelOffers] ${tag}: +DC ${base}  (classified from mixed "${key}")`);
+          }
+          dcMap.set(baseNorm, dcMap.get(baseNorm) || base);
+          dc++;
+        } else if (/\bcredit\b/.test(lower)) {
+          if (!ccMap.has(baseNorm)) {
+            console.debug(`[HotelOffers] ${tag}: +CC ${base}  (classified from mixed "${key}")`);
+          }
+          ccMap.set(baseNorm, ccMap.get(baseNorm) || base);
+          cc++;
+        } else {
+          // if nothing explicit, leave it to credit (conservative; optional)
+          if (!ccMap.has(baseNorm)) {
+            console.debug(`[HotelOffers] ${tag}: +CC* ${base}  (fallback from mixed "${key}")`);
+          }
+          ccMap.set(baseNorm, ccMap.get(baseNorm) || base);
+          cc++;
+        }
+      }
+      counters[tag].mixed += cc + dc;
     };
 
     const harvestRows = (rows, tag) => {
       for (const o of rows || []) {
-        // Prefer explicit fields, else try any header that contains the words
+        const keys = Object.keys(o || {});
+        // direct explicit fields
         const ccField =
           firstField(o, LIST_FIELDS.credit) ||
           firstFieldByContains(o, "eligible credit") ||
           firstFieldByContains(o, "credit card");
-
         const dcField =
           firstField(o, LIST_FIELDS.debit) ||
           firstFieldByContains(o, "eligible debit") ||
           firstFieldByContains(o, "debit card");
 
         if (ccField) {
-          harvestList(ccField, ccMap);
+          harvestList(ccField, ccMap, tag, "(explicit CC)");
           counters[tag].cc++;
-          matchedCreditKeys[tag].push(Object.keys(o).filter((k) => /credit/i.test(k)));
         }
         if (dcField) {
-          harvestList(dcField, dcMap);
+          harvestList(dcField, dcMap, tag, "(explicit DC)");
           counters[tag].dc++;
-          matchedDebitKeys[tag].push(Object.keys(o).filter((k) => /debit/i.test(k)));
         }
 
+        // If neither explicit CC nor DC was present/usable, try "mixed" generic eligible card fields
         if (!ccField && !dcField) {
-          console.debug(`[HotelOffers] ${tag}: row had no CC/DC fields. Keys:`, Object.keys(o));
+          // Example keys we’ll accept as “mixed” lists:
+          // - "Eligible Cards", "Eligible Card(s)", "Applicable Cards", etc.
+          const mixedPairs = entriesByRegex(o, /\beligible\b.*\bcard/i);
+          // Also accept very broad keys like "... Cards" if they look like card lists
+          const extraMixed = entriesByRegex(o, /\bcards?\b/i).filter(
+            ({ key }) => !/credit|debit/i.test(key) // avoid double-classifying explicit ones
+          );
+          const allMixed = [...mixedPairs, ...extraMixed];
+
+          // If there is a "Card Type" column, use it to bias classification
+          const typeVal = firstFieldByContains(o, "card type");
+          const typeLower = String(typeVal || "").toLowerCase();
+
+          if (allMixed.length) {
+            allMixed.forEach(({ key, value }) => {
+              if (/\bdebit\b/.test(typeLower)) {
+                harvestList(value, dcMap, tag, `${key} (type=debit)`);
+                counters[tag].dc++;
+              } else if (/\bcredit\b/.test(typeLower)) {
+                harvestList(value, ccMap, tag, `${key} (type=credit)`);
+                counters[tag].cc++;
+              } else {
+                // classify by each card's name (contains “credit”/“debit”)
+                harvestMixed(value, tag, key);
+              }
+            });
+          } else {
+            // Last resort: scan any field that *looks* like a list of cards by content
+            const possible = entriesByRegex(o, /./);
+            const likelyList = possible.find(({ value }) => /card/i.test(String(value)));
+            if (likelyList) {
+              harvestMixed(likelyList.value, tag, likelyList.key);
+            } else {
+              console.debug(`[HotelOffers] ${tag}: row had no CC/DC fields. Keys:`, keys);
+            }
+          }
         }
       }
     };
@@ -396,26 +478,10 @@ const HotelOffers = () => {
     const dcArr = Array.from(dcMap.values()).sort((a, b) => a.localeCompare(b));
 
     setMarqueeCC(ccArr);
-    setMarqueeDC(dcArr); // ✅ ONLY from offer CSVs — no fallback to allCards
+    setMarqueeDC(dcArr); // ✅ Debit marquee now filled even when CSV uses generic “Eligible Cards”
 
     console.debug("[HotelOffers] Marquee build ", {
       counters,
-      matchedCreditKeys,
-      matchedDebitKeys,
-      rawCreditSampleValues: {
-        BMS: (bmsOffers[0] && Object.keys(bmsOffers[0]).filter((k) => /credit/i.test(k))) || [],
-        CINE: (cinepolisOffers[0] && Object.keys(cinepolisOffers[0]).filter((k) => /credit/i.test(k))) || [],
-        PAYTM:
-          (paytmDistrictOffers[0] && Object.keys(paytmDistrictOffers[0]).filter((k) => /credit/i.test(k))) || [],
-        PVR: (pvrOffers[0] && Object.keys(pvrOffers[0]).filter((k) => /credit/i.test(k))) || [],
-      },
-      rawDebitSampleValues: {
-        BMS: (bmsOffers[0] && Object.keys(bmsOffers[0]).filter((k) => /debit/i.test(k))) || [],
-        CINE: (cinepolisOffers[0] && Object.keys(cinepolisOffers[0]).filter((k) => /debit/i.test(k))) || [],
-        PAYTM:
-          (paytmDistrictOffers[0] && Object.keys(paytmDistrictOffers[0]).filter((k) => /debit/i.test(k))) || [],
-        PVR: (pvrOffers[0] && Object.keys(pvrOffers[0]).filter((k) => /debit/i.test(k))) || [],
-      },
       marqueeCCCount: ccArr.length,
       marqueeDCCount: dcArr.length,
       marqueeCCSample: ccArr.slice(0, 10),
@@ -444,7 +510,7 @@ const HotelOffers = () => {
           return { it, s, inc };
         })
         .filter(({ s, inc }) => inc || s > 0.3)
-        .sort((a, b) => b.s - a.s || a.it.display.localeCompare(b.it.display))
+        .sort((a, b) => (b.s - a.s) || a.it.display.localeCompare(b.it.display))
         .slice(0, MAX_SUGGESTIONS)
         .map(({ it }) => it);
 
@@ -498,16 +564,19 @@ const HotelOffers = () => {
         const dc =
           firstField(o, LIST_FIELDS.debit) ||
           firstFieldByContains(o, "eligible debit") ||
-          firstFieldByContains(o, "debit card");
+          firstFieldByContains(o, "debit card") ||
+          firstFieldByContains(o, "eligible cards"); // allow generic field
         list = splitList(dc);
       } else {
         const cc =
           firstField(o, LIST_FIELDS.credit) ||
           firstFieldByContains(o, "eligible credit") ||
-          firstFieldByContains(o, "credit card");
+          firstFieldByContains(o, "credit card") ||
+          firstFieldByContains(o, "eligible cards"); // allow generic field
         list = splitList(cc);
       }
 
+      // If we got a generic mixed list, we’ll still check each value against the selected name
       let matched = false;
       let matchedVariant = "";
       for (const raw of list) {
@@ -530,11 +599,7 @@ const HotelOffers = () => {
   const wPermanent = matchesFor(permanentOffers, "permanent", "Permanent");
   const wBMS = matchesFor(bmsOffers, selected?.type === "debit" ? "debit" : "credit", "Bookmyshow");
   const wCinepolis = matchesFor(cinepolisOffers, selected?.type === "debit" ? "debit" : "credit", "Cinepolis");
-  const wPaytmDistrict = matchesFor(
-    paytmDistrictOffers,
-    selected?.type === "debit" ? "debit" : "credit",
-    "Paytm and District"
-  );
+  const wPaytmDistrict = matchesFor(paytmDistrictOffers, selected?.type === "debit" ? "debit" : "credit", "Paytm and District");
   const wPVR = matchesFor(pvrOffers, selected?.type === "debit" ? "debit" : "credit", "PVR");
 
   const seen = new Set();
@@ -545,12 +610,16 @@ const HotelOffers = () => {
   const dPVR = dedupWrappers(wPVR, seen);
 
   const hasAny = Boolean(
-    dPermanent.length || dBMS.length || dCinepolis.length || dPaytmDistrict.length || dPVR.length
+    dPermanent.length ||
+    dBMS.length ||
+    dCinepolis.length ||
+    dPaytmDistrict.length ||
+    dPVR.length
   );
 
   /** Offer card UI — hooks at top (no conditional hooks) */
   const OfferCard = ({ wrapper, isPermanent = false }) => {
-    const [copied, setCopied] = useState(false); // used for Paytm & District only, safe at top
+    const [copied, setCopied] = useState(false); // Paytm & District only
 
     const o = wrapper.offer;
 
@@ -566,14 +635,17 @@ const HotelOffers = () => {
 
     const siteKey = String(wrapper.site || "").toLowerCase();
     const showVariantNote =
-      VARIANT_NOTE_SITES.has(wrapper.site) && wrapper.variantText && wrapper.variantText.trim().length > 0;
+      VARIANT_NOTE_SITES.has(wrapper.site) &&
+      wrapper.variantText &&
+      wrapper.variantText.trim().length > 0;
 
     const useScroll = SCROLL_SITES.has(wrapper.site);
 
     // Defaults (kept for other/legacy sites & permanent)
-    let image =
-      firstField(o, LIST_FIELDS.image) || firstFieldByContains(o, "image"); // <- robust image header
-    let title = isPermanent ? undefined : firstField(o, LIST_FIELDS.title) || o.Website;
+    let image = firstField(o, LIST_FIELDS.image) || firstFieldByContains(o, "image");
+    let title = isPermanent
+      ? undefined
+      : firstField(o, LIST_FIELDS.title) || o.Website;
     let desc = isPermanent
       ? firstField(o, LIST_FIELDS.permanentBenefit)
       : firstField(o, LIST_FIELDS.desc);
@@ -587,18 +659,18 @@ const HotelOffers = () => {
     if (siteKey === "bookmyshow" || siteKey === "cinepolis") {
       // fields: Offer, Offer Description, Images, Link
       title = getCI(o, "Offer") ?? title;
-      desc = getCI(o, "Offer Description") ?? desc;
+      desc  = getCI(o, "Offer Description") ?? desc;
       image = getCI(o, "Images") ?? image;
-      link = getCI(o, "Link") ?? link;
+      link  = getCI(o, "Link") ?? link;
     } else if (siteKey === "paytm and district") {
       // fields: Coupon Code, Terms and conditions
       couponCode = getCI(o, "Coupon Code");
-      terms = getCI(o, "Terms and conditions");
+      terms      = getCI(o, "Terms and conditions");
     } else if (siteKey === "pvr") {
       // fields: Offer, Terms and conditions, Link, Image
       title = getCI(o, "Offer") ?? title;
       terms = getCI(o, "Terms and conditions");
-      link = getCI(o, "Link") ?? link;
+      link  = getCI(o, "Link") ?? link;
       image = getCI(o, "Image") ?? image;
       if (terms) desc = terms; // show T&C as the description area (scrollable)
     }
@@ -617,7 +689,14 @@ const HotelOffers = () => {
         <div className="offer-card">
           <div className="offer-info">
             {couponCode && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 10,
+                }}
+              >
                 <span
                   style={{
                     padding: "6px 10px",
@@ -636,12 +715,11 @@ const HotelOffers = () => {
                   title="Copy coupon code"
                   style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
                 >
-                  <span role="img" aria-hidden="true">
-                    📋
-                  </span>{" "}
-                  Copy
+                  <span role="img" aria-hidden="true">📋</span> Copy
                 </button>
-                {copied && <span style={{ color: "#1e7145", fontSize: 14 }}>Copied!</span>}
+                {copied && (
+                  <span style={{ color: "#1e7145", fontSize: 14 }}>Copied!</span>
+                )}
               </div>
             )}
 
@@ -649,7 +727,7 @@ const HotelOffers = () => {
               <div
                 className="offer-desc"
                 style={{
-                  maxHeight: 140,
+                  maxHeight: 140,   // T&C style scroll area
                   overflowY: "auto",
                   paddingRight: 8,
                   border: "1px solid #eee",
@@ -679,8 +757,12 @@ const HotelOffers = () => {
       <div className="offer-card">
         {image && <img src={image} alt="Offer" />}
         <div className="offer-info">
+          {/* Show the “offer” (title) when we have it */}
           {title && (
-            <div className="offer-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 16 }}>
+            <div
+              className="offer-title"
+              style={{ fontWeight: 700, marginBottom: 8, fontSize: 16 }}
+            >
               {title}
             </div>
           )}
@@ -691,7 +773,7 @@ const HotelOffers = () => {
               style={
                 useScroll
                   ? {
-                      maxHeight: 140,
+                      maxHeight: 140,   // T&C style scroll area
                       overflowY: "auto",
                       paddingRight: 8,
                       border: "1px solid #eee",
@@ -708,7 +790,7 @@ const HotelOffers = () => {
             </div>
           )}
 
-          {/* Permanent-only small note */}
+          {/* ➕ Permanent-note line */}
           {isPermanent && (
             <p className="inbuilt-note" style={{ marginTop: 8 }}>
               <strong>This is a inbuilt feature of this credit card</strong>
@@ -733,6 +815,7 @@ const HotelOffers = () => {
 
   return (
     <div className="App" style={{ fontFamily: "'Libre Baskerville', serif" }}>
+
       {/* 🔹 Cards-with-offers strip container */}
       {(marqueeCC.length > 0 || marqueeDC.length > 0) && (
         <div
@@ -753,7 +836,7 @@ const HotelOffers = () => {
               color: "#1F2D45",
               marginBottom: 10,
               display: "flex",
-              justifyContent: "center",
+              justifyContent:"center",
               gap: 8,
             }}
           >
@@ -794,7 +877,7 @@ const HotelOffers = () => {
             </marquee>
           )}
 
-          {/* DC marquee chips — ONLY from offer CSVs */}
+          {/* DC marquee chips — ONLY from offer CSVs (now classified from generic fields too) */}
           {marqueeDC.length > 0 && (
             <marquee direction="left" scrollAmount="4" style={{ whiteSpace: "nowrap" }}>
               <strong style={{ marginRight: 10, color: "#1F2D45" }}>Debit Cards:</strong>
@@ -955,7 +1038,9 @@ const HotelOffers = () => {
       )}
 
       {selected && !hasAny && !noMatches && (
-        <p style={{ color: "#d32f2f", textAlign: "center", marginTop: 10 }}>No offer available for this card</p>
+        <p style={{ color: "#d32f2f", textAlign: "center", marginTop: 10 }}>
+          No offer available for this card
+        </p>
       )}
 
       {selected && hasAny && !noMatches && (
