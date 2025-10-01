@@ -52,19 +52,63 @@ const toNorm = (s) =>
     .replace(/\s+/g, " ")
     .trim();
 
-function firstField(obj, keys) {
-  for (const k of keys) {
-    if (
-      obj &&
-      Object.prototype.hasOwnProperty.call(obj, k) &&
-      obj[k] !== undefined &&
-      obj[k] !== null &&
-      String(obj[k]).trim() !== ""
-    ) {
-      return obj[k];
+/** Normalize header keys aggressively (trim, strip BOM, lowercase, collapse symbols) */
+const cleanKey = (s) => String(s || "").replace(/^\uFEFF/, "").trim();
+const normKey = (s) =>
+  cleanKey(s)
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** Find a column in obj that matches any of the wanted keys (case/space/BOM-insensitive).
+ *  If no exact normalized match, fall back to any column containing the word "debit" or "credit"
+ *  depending on the wanted keys. Returns the ORIGINAL key string or undefined.
+ */
+function findKey(obj, wantedKeys) {
+  if (!obj) return undefined;
+  const rowKeys = Object.keys(obj);
+  if (!rowKeys.length) return undefined;
+
+  const wantedNorms = (wantedKeys || []).map(normKey);
+  const rowMap = new Map(); // norm -> original
+  for (const rk of rowKeys) rowMap.set(normKey(rk), rk);
+
+  // 1) exact normalized match
+  for (const w of wantedNorms) {
+    if (rowMap.has(w)) {
+      const match = rowMap.get(w);
+      if (obj[match] !== undefined && String(obj[match]).trim() !== "") {
+        return match;
+      }
+      // if empty value, still return match so caller can decide; but keep robust: return even if empty
+      return match;
     }
   }
+
+  // 2) fallback by keyword ("debit" / "credit")
+  const wantDebit = wantedNorms.join(" ").includes("debit");
+  const wantCredit = wantedNorms.join(" ").includes("credit");
+
+  if (wantDebit || wantCredit) {
+    for (const rk of rowKeys) {
+      const nk = normKey(rk);
+      if (wantDebit && nk.includes("debit")) {
+        return rk;
+      }
+      if (wantCredit && nk.includes("credit")) {
+        return rk;
+      }
+    }
+  }
+
   return undefined;
+}
+
+/** Get the value using findKey */
+function firstField(obj, keys) {
+  const key = findKey(obj, keys);
+  return key !== undefined ? obj[key] : undefined;
 }
 
 function splitList(val) {
@@ -226,19 +270,21 @@ const HotelOffers = () => {
         const rows = parsed.data || [];
         const headers = Object.keys(rows?.[0] || {});
         dbg("allCards.csv loaded", { rows: rows.length, headers });
-        dbg("LIST_FIELDS.credit", LIST_FIELDS.credit);
-        dbg("LIST_FIELDS.debit", LIST_FIELDS.debit);
 
         const creditMap = new Map();
         const debitMap = new Map();
 
         for (const row of rows) {
-          const ccList = splitList(firstField(row, LIST_FIELDS.credit));
-          const dcList = splitList(firstField(row, LIST_FIELDS.debit));
-          if (!ccList.length && !dcList.length) {
-            // If nothing matched, log a sample row's keys to catch header mismatches
+          const ccKey = findKey(row, LIST_FIELDS.credit);
+          const dcKey = findKey(row, LIST_FIELDS.debit);
+
+          if (!ccKey && !dcKey) {
             dbg("Row had no CC/DC fields match. Row keys:", Object.keys(row));
           }
+
+          const ccList = splitList(ccKey ? row[ccKey] : undefined);
+          const dcList = splitList(dcKey ? row[dcKey] : undefined);
+
           for (const raw of ccList) {
             const base = brandCanonicalize(getBase(raw));
             const baseNorm = toNorm(base);
@@ -342,18 +388,18 @@ const HotelOffers = () => {
 
     const harvestRows = (rows, tag) => {
       for (const o of rows || []) {
-        const ccField = firstField(o, LIST_FIELDS.credit);
-        if (ccField) {
+        const ccKey = findKey(o, LIST_FIELDS.credit);
+        const dcKey = findKey(o, LIST_FIELDS.debit);
+
+        if (ccKey) {
           counters[tag].creditRowsWithField++;
-          harvestList(ccField, ccMap);
+          harvestList(o[ccKey], ccMap);
         }
-        const dcField = firstField(o, LIST_FIELDS.debit);
-        if (dcField) {
+        if (dcKey) {
           counters[tag].debitRowsWithField++;
-          harvestList(dcField, dcMap);
+          harvestList(o[dcKey], dcMap);
         }
-        if (!ccField && !dcField) {
-          // Log a sample row's keys to diagnose header mismatches
+        if (!ccKey && !dcKey) {
           dbg(`${tag}: row had no CC/DC fields. Keys:`, Object.keys(o));
         }
       }
@@ -366,12 +412,17 @@ const HotelOffers = () => {
 
     // Permanent offers: treat "Credit Card Name" as CC
     for (const o of permanentOffers || []) {
-      const nm = firstField(o, LIST_FIELDS.permanentCCName);
-      if (nm) {
-        counters.PERM.ccNameRows++;
-        const base = brandCanonicalize(getBase(nm));
-        const baseNorm = toNorm(base);
-        if (baseNorm) ccMap.set(baseNorm, ccMap.get(baseNorm) || base);
+      const keyUsed = findKey(o, LIST_FIELDS.permanentCCName);
+      if (keyUsed) {
+        const nm = o[keyUsed];
+        if (String(nm || "").trim()) {
+          counters.PERM.ccNameRows++;
+          const base = brandCanonicalize(getBase(nm));
+          const baseNorm = toNorm(base);
+          if (baseNorm) ccMap.set(baseNorm, ccMap.get(baseNorm) || base);
+        } else {
+          dbg("PERM: empty Credit Card Name value. Keys:", Object.keys(o));
+        }
       } else {
         dbg("PERM: row missing Credit Card Name. Keys:", Object.keys(o));
       }
@@ -476,9 +527,11 @@ const HotelOffers = () => {
         const nm = firstField(o, LIST_FIELDS.permanentCCName);
         if (nm) list = [nm]; // single card name
       } else if (type === "debit") {
-        list = splitList(firstField(o, LIST_FIELDS.debit));
+        const key = findKey(o, LIST_FIELDS.debit);
+        list = splitList(key ? o[key] : undefined);
       } else {
-        list = splitList(firstField(o, LIST_FIELDS.credit));
+        const key = findKey(o, LIST_FIELDS.credit);
+        list = splitList(key ? o[key] : undefined);
       }
 
       let matched = false;
