@@ -3,20 +3,12 @@ import axios from "axios";
 import Papa from "papaparse";
 import "./App.css";
 
-/** -------------------- DEBUG -------------------- */
-const DBG = true;
-const dbg = (...args) => {
-  if (DBG && typeof console !== "undefined") {
-    console.log("[HotelOffers]", ...args);
-  }
-};
-
 /** -------------------- CONFIG -------------------- */
 const LIST_FIELDS = {
   credit: ["Eligible Credit Cards", "Eligible Cards"],
   debit: ["Eligible Debit Cards", "Applicable Debit Cards"],
   title: ["Offer Title", "Title"],
-  image: ["Image", "Credit Card Image", "Offer Image", "image", "Image URL"], // ✅ added "Image URL"
+  image: ["Image", "Credit Card Image", "Offer Image", "image", "Image URL"],
   link: ["Link", "Offer Link"],
   desc: ["Description", "Details", "Offer Description", "Flight Benefit"],
   // Permanent (inbuilt) CSV fields
@@ -27,21 +19,9 @@ const LIST_FIELDS = {
 const MAX_SUGGESTIONS = 50;
 
 /** Sites that should display the red per-card “Applicable only on {variant} variant” note */
-const VARIANT_NOTE_SITES = new Set([
-  "Bookmyshow",
-  "Cinepolis",
-  "Paytm and District",
-  "PVR",
-  "Permanent",
-]);
-
+const VARIANT_NOTE_SITES = new Set(["Bookmyshow", "Cinepolis", "Paytm and District", "PVR", "Permanent"]);
 /** Sites whose description should be in a scrollable T&C-style box */
-const SCROLL_SITES = new Set([
-  "Bookmyshow",
-  "Cinepolis",
-  "Paytm and District",
-  "PVR",
-]);
+const SCROLL_SITES = new Set(["Bookmyshow", "Cinepolis", "Paytm and District", "PVR"]);
 
 /** -------------------- HELPERS -------------------- */
 const toNorm = (s) =>
@@ -52,72 +32,39 @@ const toNorm = (s) =>
     .replace(/\s+/g, " ")
     .trim();
 
-/** Trim BOM + NBSP + spaces */
-const cleanKey = (s) => String(s || "").replace(/^\uFEFF/, "").trim();
-const cleanCell = (s) =>
-  String(s ?? "")
-    .replace(/^\uFEFF/, "")
-    .replace(/\u00A0/g, " ")
-    .trim();
-
-const normKey = (s) =>
-  cleanKey(s)
-    .toLowerCase()
-    .replace(/[^\w\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-/** Find a column in obj that matches any of the wanted keys (case/space/BOM-insensitive).
- *  If no exact normalized match, fall back to any column containing the word "debit" or "credit"
- */
-function findKey(obj, wantedKeys) {
-  if (!obj) return undefined;
-  const rowKeys = Object.keys(obj);
-  if (!rowKeys.length) return undefined;
-
-  const wantedNorms = (wantedKeys || []).map(normKey);
-  const rowMap = new Map(); // norm -> original
-  for (const rk of rowKeys) rowMap.set(normKey(rk), rk);
-
-  // 1) exact normalized match
-  for (const w of wantedNorms) {
-    if (rowMap.has(w)) {
-      const match = rowMap.get(w);
-      return match; // return even if empty; caller will decide
+function firstField(obj, keys) {
+  for (const k of keys) {
+    if (
+      obj &&
+      Object.prototype.hasOwnProperty.call(obj, k) &&
+      obj[k] !== undefined &&
+      obj[k] !== null &&
+      String(obj[k]).trim() !== ""
+    ) {
+      return obj[k];
     }
   }
-
-  // 2) fallback by keyword ("debit" / "credit")
-  const wantDebit = wantedNorms.join(" ").includes("debit");
-  const wantCredit = wantedNorms.join(" ").includes("credit");
-
-  if (wantDebit || wantCredit) {
-    for (const rk of rowKeys) {
-      const nk = normKey(rk);
-      if (wantDebit && nk.includes("debit")) {
-        return rk;
-      }
-      if (wantCredit && nk.includes("credit")) {
-        return rk;
-      }
-    }
-  }
-
   return undefined;
 }
 
-/** Get the value using findKey */
-function firstField(obj, keys) {
-  const key = findKey(obj, keys);
-  return key !== undefined ? obj[key] : undefined;
+/** Find first value where key contains a substring (case-insensitive) */
+function firstFieldByContains(obj, substr) {
+  if (!obj) return undefined;
+  const target = String(substr).toLowerCase();
+  for (const k of Object.keys(obj)) {
+    if (String(k).toLowerCase().includes(target)) {
+      const v = obj[k];
+      if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+    }
+  }
+  return undefined;
 }
 
-/** Split helper that handles commas, slashes, semicolons, pipes, “and”, “&”, bullets, and newlines */
 function splitList(val) {
-  const v = cleanCell(val);
-  if (!v) return [];
-  return v
-    .split(/\r?\n|[,;|/]|(?:\s+and\s+)|&|•/gi)
+  if (!val) return [];
+  return String(val)
+    .replace(/\n/g, " ")
+    .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
 }
@@ -153,7 +100,8 @@ function brandCanonicalize(text) {
 function lev(a, b) {
   a = toNorm(a);
   b = toNorm(b);
-  const n = a.length, m = b.length;
+  const n = a.length,
+    m = b.length;
   if (!n) return m;
   if (!m) return n;
   const d = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
@@ -199,7 +147,8 @@ function normalizeText(s) {
   return toNorm(s || "");
 }
 function offerKey(offer) {
-  const image = normalizeUrl(firstField(offer, LIST_FIELDS.image) || "");
+  const imgGuess = firstField(offer, LIST_FIELDS.image) || firstFieldByContains(offer, "image");
+  const image = normalizeUrl(imgGuess || "");
   const title = normalizeText(firstField(offer, LIST_FIELDS.title) || offer.Website || "");
   const desc = normalizeText(firstField(offer, LIST_FIELDS.desc) || "");
   const link = normalizeUrl(firstField(offer, LIST_FIELDS.link) || "");
@@ -222,10 +171,10 @@ const Disclaimer = () => (
   <section className="disclaimer">
     <h3>Disclaimer</h3>
     <p>
-      All offers, coupons, and discounts listed on our platform are provided for informational purposes only.
-      We do not guarantee the accuracy, availability, or validity of any offer. Users are advised to verify the
-      terms and conditions with the respective merchants before making any purchase. We are not responsible for any
-      discrepancies, expired offers, or losses arising from the use of these coupons.
+      All offers, coupons, and discounts listed on our platform are provided for informational purposes only. We do not
+      guarantee the accuracy, availability, or validity of any offer. Users are advised to verify the terms and
+      conditions with the respective merchants before making any purchase. We are not responsible for any discrepancies,
+      expired offers, or losses arising from the use of these coupons.
     </p>
   </section>
 );
@@ -236,7 +185,7 @@ const HotelOffers = () => {
   const [creditEntries, setCreditEntries] = useState([]);
   const [debitEntries, setDebitEntries] = useState([]);
 
-  // marquee lists (from offer CSVs; fallback to allCards if empty)
+  // marquee lists (from offer CSVs ONLY — NOT all_cards.csv)
   const [marqueeCC, setMarqueeCC] = useState([]);
   const [marqueeDC, setMarqueeDC] = useState([]);
 
@@ -248,11 +197,11 @@ const HotelOffers = () => {
   const [isMobile, setIsMobile] = useState(false);
 
   // offers (only these four + permanent)
-  const [bmsOffers, setBMSOffers] = useState([]);                   // BookMyShow
-  const [cinepolisOffers, setCinepolisOffers] = useState([]);       // Cinepolis
+  const [bmsOffers, setBMSOffers] = useState([]); // BookMyShow
+  const [cinepolisOffers, setCinepolisOffers] = useState([]); // Cinepolis
   const [paytmDistrictOffers, setPaytmDistrictOffers] = useState([]); // Paytm & District
-  const [pvrOffers, setPVROffers] = useState([]);                   // PVR
-  const [permanentOffers, setPermanentOffers] = useState([]);       // Permanent
+  const [pvrOffers, setPVROffers] = useState([]); // PVR
+  const [permanentOffers, setPermanentOffers] = useState([]); // Permanent
 
   // responsive
   useEffect(() => {
@@ -264,34 +213,24 @@ const HotelOffers = () => {
 
   // 1) Load all_cards.csv for dropdown lists ONLY
   useEffect(() => {
-    async function loadAllCards() {
+    (async () => {
       try {
-        dbg("Loading allCards.csv …");
+        console.debug("[HotelOffers] Loading allCards.csv …");
         const res = await axios.get(`/allCards.csv`);
         const parsed = Papa.parse(res.data, { header: true });
         const rows = parsed.data || [];
-        const headers = Object.keys(rows?.[0] || {});
-        dbg("allCards.csv loaded", { rows: rows.length, headers });
 
         const creditMap = new Map();
         const debitMap = new Map();
 
         for (const row of rows) {
-          const ccKey = findKey(row, LIST_FIELDS.credit);
-          const dcKey = findKey(row, LIST_FIELDS.debit);
-
-          if (!ccKey && !dcKey) {
-            dbg("Row had no CC/DC fields match. Row keys:", Object.keys(row));
-          }
-
-          const ccList = splitList(ccKey ? row[ccKey] : undefined);
-          const dcList = splitList(dcKey ? row[dcKey] : undefined);
-
+          const ccList = splitList(firstField(row, LIST_FIELDS.credit));
           for (const raw of ccList) {
             const base = brandCanonicalize(getBase(raw));
             const baseNorm = toNorm(base);
             if (baseNorm) creditMap.set(baseNorm, creditMap.get(baseNorm) || base);
           }
+          const dcList = splitList(firstField(row, LIST_FIELDS.debit));
           for (const raw of dcList) {
             const base = brandCanonicalize(getBase(raw));
             const baseNorm = toNorm(base);
@@ -306,15 +245,19 @@ const HotelOffers = () => {
           .sort((a, b) => a.localeCompare(b))
           .map((d) => makeEntry(d, "debit"));
 
-        dbg("Dropdown lists built", {
-          creditCount: credit.length,
-          debitCount: debit.length,
-          creditSample: credit.slice(0, 5),
-          debitSample: debit.slice(0, 5),
-        });
-
         setCreditEntries(credit);
         setDebitEntries(debit);
+
+        console.debug("[HotelOffers] allCards.csv loaded ", {
+          rows: rows.length,
+          headers: Object.keys(rows[0] || {}),
+        });
+        console.debug("[HotelOffers] Dropdown lists built ", {
+          creditCount: credit.length,
+          debitCount: debit.length,
+          creditSample: credit.slice(0, 5).map((x) => x.display),
+          debitSample: debit.slice(0, 5).map((x) => x.display),
+        });
 
         setFilteredCards([
           ...(credit.length ? [{ type: "heading", label: "Credit Cards" }] : []),
@@ -324,114 +267,104 @@ const HotelOffers = () => {
         ]);
 
         if (!credit.length && !debit.length) {
-          dbg("No credit or debit entries found in allCards.csv");
           setNoMatches(true);
           setSelected(null);
         }
       } catch (e) {
-        console.error("all_cards.csv load error:", e);
+        console.debug("[HotelOffers] all_cards.csv load error:", e);
         setNoMatches(true);
         setSelected(null);
       }
-    }
-    loadAllCards();
+    })();
   }, []);
 
   // 2) Load ONLY the requested offer CSVs
   useEffect(() => {
-    async function loadOffers() {
+    (async () => {
       try {
-        const files = [
-          { name: "bookmyshow.csv", setter: setBMSOffers, key: "BMS" },
-          { name: "cinepolis.csv", setter: setCinepolisOffers, key: "CINE" },
-          { name: "district_paytm.csv", setter: setPaytmDistrictOffers, key: "PAYTM" },
-          { name: "pvr.csv", setter: setPVROffers, key: "PVR" },
-          { name: "permanent_offers.csv", setter: setPermanentOffers, key: "PERM" },
+        console.debug("[HotelOffers] Loading bookmyshow.csv …");
+        console.debug("[HotelOffers] Loading cinepolis.csv …");
+        console.debug("[HotelOffers] Loading district_paytm.csv …");
+        console.debug("[HotelOffers] Loading pvr.csv …");
+        console.debug("[HotelOffers] Loading permanent_offers.csv …");
+
+        const specs = [
+          { key: "BMS", name: "bookmyshow.csv", setter: setBMSOffers },
+          { key: "CINE", name: "cinepolis.csv", setter: setCinepolisOffers },
+          { key: "PAYTM", name: "district_paytm.csv", setter: setPaytmDistrictOffers },
+          { key: "PVR", name: "pvr.csv", setter: setPVROffers },
+          { key: "PERM", name: "permanent_offers.csv", setter: setPermanentOffers },
         ];
 
         await Promise.all(
-          files.map(async (f) => {
-            dbg(`Loading ${f.name} …`);
+          specs.map(async (f) => {
             const res = await axios.get(`/${encodeURIComponent(f.name)}`);
             const parsed = Papa.parse(res.data, { header: true });
             const rows = parsed.data || [];
-            const headers = Object.keys(rows?.[0] || {});
-            dbg(`${f.name} loaded`, { key: f.key, rows: rows.length, headers });
             f.setter(rows);
+            console.debug(`[HotelOffers] ${f.name} loaded `, {
+              key: f.key,
+              rows: rows.length,
+              headers: Object.keys(rows[0] || {}),
+            });
           })
         );
       } catch (e) {
-        console.error("Offer CSV load error:", e);
+        console.debug("[HotelOffers] Offer CSV load error:", e);
       }
-    }
-    loadOffers();
+    })();
   }, []);
 
-  /** Build marquee lists from OFFER CSVs (exclude allCards.csv); fallback to allCards if empty */
+  /** Build marquee lists from OFFER CSVs (exclude allCards.csv) — NO FALLBACKS */
   useEffect(() => {
     const ccMap = new Map(); // baseNorm -> display
     const dcMap = new Map();
 
-    // track which headers matched in each file
-    const matchedCreditKeys = { BMS: new Set(), CINE: new Set(), PAYTM: new Set(), PVR: new Set() };
-    const matchedDebitKeys  = { BMS: new Set(), CINE: new Set(), PAYTM: new Set(), PVR: new Set() };
-
-    // sample harvested values for visibility
-    const dcSamples = { BMS: [], CINE: [], PAYTM: [], PVR: [] };
-    const ccSamples = { BMS: [], CINE: [], PAYTM: [], PVR: [] };
-
-    // raw cell samples (first 3 per file) to debug why split produced zero items
-    const rawDebitSampleValues  = { BMS: [], CINE: [], PAYTM: [], PVR: [] };
-    const rawCreditSampleValues = { BMS: [], CINE: [], PAYTM: [], PVR: [] };
+    const matchedCreditKeys = { BMS: [], CINE: [], PAYTM: [], PVR: [] };
+    const matchedDebitKeys = { BMS: [], CINE: [], PAYTM: [], PVR: [] };
 
     const counters = {
-      BMS: { creditRowsWithField: 0, debitRowsWithField: 0, rows: bmsOffers.length, nonEmptyDebitZeroSplit: 0, nonEmptyCreditZeroSplit: 0 },
-      CINE: { creditRowsWithField: 0, debitRowsWithField: 0, rows: cinepolisOffers.length, nonEmptyDebitZeroSplit: 0, nonEmptyCreditZeroSplit: 0 },
-      PAYTM: { creditRowsWithField: 0, debitRowsWithField: 0, rows: paytmDistrictOffers.length, nonEmptyDebitZeroSplit: 0, nonEmptyCreditZeroSplit: 0 },
-      PVR: { creditRowsWithField: 0, debitRowsWithField: 0, rows: pvrOffers.length, nonEmptyDebitZeroSplit: 0, nonEmptyCreditZeroSplit: 0 },
-      PERM: { ccNameRows: 0, rows: permanentOffers.length },
+      BMS: { cc: 0, dc: 0 },
+      CINE: { cc: 0, dc: 0 },
+      PAYTM: { cc: 0, dc: 0 },
+      PVR: { cc: 0, dc: 0 },
+      PERM: { cc: 0 },
     };
 
-    const harvestList = (val, targetMap, sampleArr, tag, kind) => {
-      const raw = cleanCell(val);
-      if (raw && (rawDebitSampleValues[tag] || rawCreditSampleValues[tag])) {
-        if (kind === "debit" && rawDebitSampleValues[tag].length < 3) rawDebitSampleValues[tag].push(raw);
-        if (kind === "credit" && rawCreditSampleValues[tag].length < 3) rawCreditSampleValues[tag].push(raw);
-      }
-
-      const list = splitList(raw);
-      if (raw && list.length === 0) {
-        if (kind === "debit") counters[tag].nonEmptyDebitZeroSplit++;
-        if (kind === "credit") counters[tag].nonEmptyCreditZeroSplit++;
-      }
-
-      for (const item of list) {
-        const base = brandCanonicalize(getBase(item)); // strips "(Variant)"
+    const harvestList = (val, targetMap) => {
+      for (const raw of splitList(val)) {
+        const base = brandCanonicalize(getBase(raw));
         const baseNorm = toNorm(base);
-        if (baseNorm) {
-          targetMap.set(baseNorm, targetMap.get(baseNorm) || base);
-          if (sampleArr && sampleArr.length < 5) sampleArr.push(base);
-        }
+        if (baseNorm) targetMap.set(baseNorm, targetMap.get(baseNorm) || base);
       }
     };
 
     const harvestRows = (rows, tag) => {
       for (const o of rows || []) {
-        const ccKey = findKey(o, LIST_FIELDS.credit);
-        const dcKey = findKey(o, LIST_FIELDS.debit);
+        // Prefer explicit fields, else try any header that contains the words
+        const ccField =
+          firstField(o, LIST_FIELDS.credit) ||
+          firstFieldByContains(o, "eligible credit") ||
+          firstFieldByContains(o, "credit card");
 
-        if (ccKey) {
-          counters[tag].creditRowsWithField++;
-          matchedCreditKeys[tag].add(ccKey);
-          harvestList(o[ccKey], ccMap, ccSamples[tag], tag, "credit");
+        const dcField =
+          firstField(o, LIST_FIELDS.debit) ||
+          firstFieldByContains(o, "eligible debit") ||
+          firstFieldByContains(o, "debit card");
+
+        if (ccField) {
+          harvestList(ccField, ccMap);
+          counters[tag].cc++;
+          matchedCreditKeys[tag].push(Object.keys(o).filter((k) => /credit/i.test(k)));
         }
-        if (dcKey) {
-          counters[tag].debitRowsWithField++;
-          matchedDebitKeys[tag].add(dcKey);
-          harvestList(o[dcKey], dcMap, dcSamples[tag], tag, "debit");
+        if (dcField) {
+          harvestList(dcField, dcMap);
+          counters[tag].dc++;
+          matchedDebitKeys[tag].push(Object.keys(o).filter((k) => /debit/i.test(k)));
         }
-        if (!ccKey && !dcKey) {
-          dbg(`${tag}: row had no CC/DC fields. Keys:`, Object.keys(o));
+
+        if (!ccField && !dcField) {
+          console.debug(`[HotelOffers] ${tag}: row had no CC/DC fields. Keys:`, Object.keys(o));
         }
       }
     };
@@ -441,79 +374,54 @@ const HotelOffers = () => {
     harvestRows(paytmDistrictOffers, "PAYTM");
     harvestRows(pvrOffers, "PVR");
 
-    // Permanent offers: treat "Credit Card Name" as CC
+    // Permanent offers: treat "Credit Card Name" as CC only (no DC here)
     for (const o of permanentOffers || []) {
-      const keyUsed = findKey(o, LIST_FIELDS.permanentCCName);
-      if (keyUsed) {
-        const nmRaw = o[keyUsed];
-        const nm = cleanCell(nmRaw);
-        if (nm) {
-          counters.PERM.ccNameRows++;
-          const base = brandCanonicalize(getBase(nm));
-          const baseNorm = toNorm(base);
-          if (baseNorm) ccMap.set(baseNorm, ccMap.get(baseNorm) || base);
-        } else {
-          dbg("PERM: empty Credit Card Name value. Keys:", Object.keys(o));
-        }
-      } else {
-        dbg("PERM: row missing Credit Card Name. Keys:", Object.keys(o));
+      const nm =
+        firstField(o, LIST_FIELDS.permanentCCName) || firstFieldByContains(o, "credit card name");
+      if (!Object.keys(o || {}).length) {
+        console.debug("[HotelOffers] PERM: row missing Credit Card Name. Keys:", Object.keys(o || {}));
+        continue;
       }
+      if (!nm || !String(nm).trim()) {
+        console.debug("[HotelOffers] PERM: empty Credit Card Name value. Keys:", Object.keys(o || {}));
+        continue;
+      }
+      const base = brandCanonicalize(getBase(nm));
+      const baseNorm = toNorm(base);
+      if (baseNorm) ccMap.set(baseNorm, ccMap.get(baseNorm) || base);
+      counters.PERM.cc++;
     }
 
-    // Build lists from the harvested maps
-    let ccList = Array.from(ccMap.values()).sort((a, b) => a.localeCompare(b));
-    let dcList = Array.from(dcMap.values()).sort((a, b) => a.localeCompare(b));
+    const ccArr = Array.from(ccMap.values()).sort((a, b) => a.localeCompare(b));
+    const dcArr = Array.from(dcMap.values()).sort((a, b) => a.localeCompare(b));
 
-    // 🔁 Fallbacks: if nothing harvested from offer CSVs, use allCards lists
-    if (dcList.length === 0 && debitEntries.length > 0) {
-      dcList = debitEntries.map((e) => e.display);
-      dbg("Marquee DC fallback → using allCards debit list", {
-        debitEntriesCount: debitEntries.length,
-      });
-    }
-    if (ccList.length === 0 && creditEntries.length > 0) {
-      ccList = creditEntries.map((e) => e.display);
-      dbg("Marquee CC fallback → using allCards credit list", {
-        creditEntriesCount: creditEntries.length,
-      });
-    }
+    setMarqueeCC(ccArr);
+    setMarqueeDC(dcArr); // ✅ ONLY from offer CSVs — no fallback to allCards
 
-    setMarqueeCC(ccList);
-    setMarqueeDC(dcList);
-
-    dbg("Marquee build", {
+    console.debug("[HotelOffers] Marquee build ", {
       counters,
-      matchedCreditKeys: {
-        BMS: Array.from(matchedCreditKeys.BMS),
-        CINE: Array.from(matchedCreditKeys.CINE),
-        PAYTM: Array.from(matchedCreditKeys.PAYTM),
-        PVR: Array.from(matchedCreditKeys.PVR),
+      matchedCreditKeys,
+      matchedDebitKeys,
+      rawCreditSampleValues: {
+        BMS: (bmsOffers[0] && Object.keys(bmsOffers[0]).filter((k) => /credit/i.test(k))) || [],
+        CINE: (cinepolisOffers[0] && Object.keys(cinepolisOffers[0]).filter((k) => /credit/i.test(k))) || [],
+        PAYTM:
+          (paytmDistrictOffers[0] && Object.keys(paytmDistrictOffers[0]).filter((k) => /credit/i.test(k))) || [],
+        PVR: (pvrOffers[0] && Object.keys(pvrOffers[0]).filter((k) => /credit/i.test(k))) || [],
       },
-      matchedDebitKeys: {
-        BMS: Array.from(matchedDebitKeys.BMS),
-        CINE: Array.from(matchedDebitKeys.CINE),
-        PAYTM: Array.from(matchedDebitKeys.PAYTM),
-        PVR: Array.from(matchedDebitKeys.PVR),
+      rawDebitSampleValues: {
+        BMS: (bmsOffers[0] && Object.keys(bmsOffers[0]).filter((k) => /debit/i.test(k))) || [],
+        CINE: (cinepolisOffers[0] && Object.keys(cinepolisOffers[0]).filter((k) => /debit/i.test(k))) || [],
+        PAYTM:
+          (paytmDistrictOffers[0] && Object.keys(paytmDistrictOffers[0]).filter((k) => /debit/i.test(k))) || [],
+        PVR: (pvrOffers[0] && Object.keys(pvrOffers[0]).filter((k) => /debit/i.test(k))) || [],
       },
-      rawCreditSampleValues,
-      rawDebitSampleValues,
-      ccSamples,
-      dcSamples,
-      marqueeCCCount: ccList.length,
-      marqueeDCCount: dcList.length,
-      marqueeCCSample: ccList.slice(0, 10),
-      marqueeDCSample: dcList.slice(0, 10),
-      LIST_FIELDS_debit: LIST_FIELDS.debit,
+      marqueeCCCount: ccArr.length,
+      marqueeDCCount: dcArr.length,
+      marqueeCCSample: ccArr.slice(0, 10),
+      marqueeDCSample: dcArr.slice(0, 10),
     });
-  }, [
-    bmsOffers,
-    cinepolisOffers,
-    paytmDistrictOffers,
-    pvrOffers,
-    permanentOffers,
-    creditEntries,   // ✅ include dropdown lists for fallback
-    debitEntries,    // ✅ include dropdown lists for fallback
-  ]);
+  }, [bmsOffers, cinepolisOffers, paytmDistrictOffers, pvrOffers, permanentOffers]);
 
   /** search box */
   const onChangeQuery = (e) => {
@@ -536,19 +444,12 @@ const HotelOffers = () => {
           return { it, s, inc };
         })
         .filter(({ s, inc }) => inc || s > 0.3)
-        .sort((a, b) => (b.s - a.s) || a.it.display.localeCompare(b.it.display))
+        .sort((a, b) => b.s - a.s || a.it.display.localeCompare(b.it.display))
         .slice(0, MAX_SUGGESTIONS)
         .map(({ it }) => it);
 
     const cc = scored(creditEntries);
     const dc = scored(debitEntries);
-
-    dbg("Search", {
-      query: val,
-      results: { cc: cc.length, dc: dc.length },
-      ccSample: cc.slice(0, 3),
-      dcSample: dc.slice(0, 3),
-    });
 
     if (!cc.length && !dc.length) {
       setNoMatches(true);
@@ -567,7 +468,6 @@ const HotelOffers = () => {
   };
 
   const onPick = (entry) => {
-    dbg("Picked entry", entry);
     setSelected(entry);
     setQuery(entry.display);
     setFilteredCards([]);
@@ -578,10 +478,8 @@ const HotelOffers = () => {
   const handleChipClick = (name, type) => {
     const display = brandCanonicalize(getBase(name));
     const baseNorm = toNorm(display);
-    const entry = { type, display, baseNorm };
-    dbg("Chip click → selecting", entry);
     setQuery(display);
-    setSelected(entry);
+    setSelected({ type, display, baseNorm });
     setFilteredCards([]);
     setNoMatches(false);
   };
@@ -590,20 +488,24 @@ const HotelOffers = () => {
   function matchesFor(offers, type, site) {
     if (!selected) return [];
     const out = [];
-    let total = 0, hit = 0;
-
     for (const o of offers || []) {
-      total++;
       let list = [];
       if (type === "permanent") {
-        const nm = firstField(o, LIST_FIELDS.permanentCCName);
+        const nm =
+          firstField(o, LIST_FIELDS.permanentCCName) || firstFieldByContains(o, "credit card name");
         if (nm) list = [nm]; // single card name
       } else if (type === "debit") {
-        const key = findKey(o, LIST_FIELDS.debit);
-        list = splitList(key ? o[key] : undefined);
+        const dc =
+          firstField(o, LIST_FIELDS.debit) ||
+          firstFieldByContains(o, "eligible debit") ||
+          firstFieldByContains(o, "debit card");
+        list = splitList(dc);
       } else {
-        const key = findKey(o, LIST_FIELDS.credit);
-        list = splitList(key ? o[key] : undefined);
+        const cc =
+          firstField(o, LIST_FIELDS.credit) ||
+          firstFieldByContains(o, "eligible credit") ||
+          firstFieldByContains(o, "credit card");
+        list = splitList(cc);
       }
 
       let matched = false;
@@ -618,12 +520,9 @@ const HotelOffers = () => {
         }
       }
       if (matched) {
-        hit++;
         out.push({ offer: o, site, variantText: matchedVariant });
       }
     }
-
-    dbg("matchesFor", { site, type, totalRows: total, matchedRows: hit, selected: selected?.display });
     return out;
   }
 
@@ -631,7 +530,11 @@ const HotelOffers = () => {
   const wPermanent = matchesFor(permanentOffers, "permanent", "Permanent");
   const wBMS = matchesFor(bmsOffers, selected?.type === "debit" ? "debit" : "credit", "Bookmyshow");
   const wCinepolis = matchesFor(cinepolisOffers, selected?.type === "debit" ? "debit" : "credit", "Cinepolis");
-  const wPaytmDistrict = matchesFor(paytmDistrictOffers, selected?.type === "debit" ? "debit" : "credit", "Paytm and District");
+  const wPaytmDistrict = matchesFor(
+    paytmDistrictOffers,
+    selected?.type === "debit" ? "debit" : "credit",
+    "Paytm and District"
+  );
   const wPVR = matchesFor(pvrOffers, selected?.type === "debit" ? "debit" : "credit", "PVR");
 
   const seen = new Set();
@@ -642,22 +545,8 @@ const HotelOffers = () => {
   const dPVR = dedupWrappers(wPVR, seen);
 
   const hasAny = Boolean(
-    dPermanent.length ||
-    dBMS.length ||
-    dCinepolis.length ||
-    dPaytmDistrict.length ||
-    dPVR.length
+    dPermanent.length || dBMS.length || dCinepolis.length || dPaytmDistrict.length || dPVR.length
   );
-  dbg("Offer presence", {
-    hasAny,
-    counts: {
-      permanent: dPermanent.length,
-      bms: dBMS.length,
-      cinepolis: dCinepolis.length,
-      paytm: dPaytmDistrict.length,
-      pvr: dPVR.length,
-    }
-  });
 
   /** Offer card UI — hooks at top (no conditional hooks) */
   const OfferCard = ({ wrapper, isPermanent = false }) => {
@@ -677,17 +566,14 @@ const HotelOffers = () => {
 
     const siteKey = String(wrapper.site || "").toLowerCase();
     const showVariantNote =
-      VARIANT_NOTE_SITES.has(wrapper.site) &&
-      wrapper.variantText &&
-      wrapper.variantText.trim().length > 0;
+      VARIANT_NOTE_SITES.has(wrapper.site) && wrapper.variantText && wrapper.variantText.trim().length > 0;
 
     const useScroll = SCROLL_SITES.has(wrapper.site);
 
     // Defaults (kept for other/legacy sites & permanent)
-    let image = firstField(o, LIST_FIELDS.image);
-    let title = isPermanent
-      ? undefined
-      : firstField(o, LIST_FIELDS.title) || o.Website;
+    let image =
+      firstField(o, LIST_FIELDS.image) || firstFieldByContains(o, "image"); // <- robust image header
+    let title = isPermanent ? undefined : firstField(o, LIST_FIELDS.title) || o.Website;
     let desc = isPermanent
       ? firstField(o, LIST_FIELDS.permanentBenefit)
       : firstField(o, LIST_FIELDS.desc);
@@ -701,35 +587,21 @@ const HotelOffers = () => {
     if (siteKey === "bookmyshow" || siteKey === "cinepolis") {
       // fields: Offer, Offer Description, Images, Link
       title = getCI(o, "Offer") ?? title;
-      desc  = getCI(o, "Offer Description") ?? desc;
+      desc = getCI(o, "Offer Description") ?? desc;
       image = getCI(o, "Images") ?? image;
-      link  = getCI(o, "Link") ?? link;
+      link = getCI(o, "Link") ?? link;
     } else if (siteKey === "paytm and district") {
       // fields: Coupon Code, Terms and conditions
       couponCode = getCI(o, "Coupon Code");
-      terms      = getCI(o, "Terms and conditions");
+      terms = getCI(o, "Terms and conditions");
     } else if (siteKey === "pvr") {
       // fields: Offer, Terms and conditions, Link, Image
       title = getCI(o, "Offer") ?? title;
       terms = getCI(o, "Terms and conditions");
-      link  = getCI(o, "Link") ?? link;
+      link = getCI(o, "Link") ?? link;
       image = getCI(o, "Image") ?? image;
       if (terms) desc = terms; // show T&C as the description area (scrollable)
     }
-
-    // One-time per-card debug
-    dbg("OfferCard render", {
-      site: wrapper.site,
-      isPermanent,
-      have: {
-        image: !!image,
-        title: !!title,
-        desc: !!desc,
-        link: !!link,
-        couponCode: !!couponCode,
-        terms: !!terms,
-      },
-    });
 
     const onCopy = () => {
       if (!couponCode) return;
@@ -745,14 +617,7 @@ const HotelOffers = () => {
         <div className="offer-card">
           <div className="offer-info">
             {couponCode && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  marginBottom: 10,
-                }}
-              >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                 <span
                   style={{
                     padding: "6px 10px",
@@ -771,11 +636,12 @@ const HotelOffers = () => {
                   title="Copy coupon code"
                   style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
                 >
-                  <span role="img" aria-hidden="true">📋</span> Copy
+                  <span role="img" aria-hidden="true">
+                    📋
+                  </span>{" "}
+                  Copy
                 </button>
-                {copied && (
-                  <span style={{ color: "#1e7145", fontSize: 14 }}>Copied!</span>
-                )}
+                {copied && <span style={{ color: "#1e7145", fontSize: 14 }}>Copied!</span>}
               </div>
             )}
 
@@ -783,7 +649,7 @@ const HotelOffers = () => {
               <div
                 className="offer-desc"
                 style={{
-                  maxHeight: 140,   // T&C style scroll area
+                  maxHeight: 140,
                   overflowY: "auto",
                   paddingRight: 8,
                   border: "1px solid #eee",
@@ -813,12 +679,8 @@ const HotelOffers = () => {
       <div className="offer-card">
         {image && <img src={image} alt="Offer" />}
         <div className="offer-info">
-          {/* Show the “offer” (title) when we have it */}
           {title && (
-            <div
-              className="offer-title"
-              style={{ fontWeight: 700, marginBottom: 8, fontSize: 16 }}
-            >
+            <div className="offer-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 16 }}>
               {title}
             </div>
           )}
@@ -829,7 +691,7 @@ const HotelOffers = () => {
               style={
                 useScroll
                   ? {
-                      maxHeight: 140,   // T&C style scroll area
+                      maxHeight: 140,
                       overflowY: "auto",
                       paddingRight: 8,
                       border: "1px solid #eee",
@@ -846,7 +708,7 @@ const HotelOffers = () => {
             </div>
           )}
 
-          {/* ➕ Permanent-note line */}
+          {/* Permanent-only small note */}
           {isPermanent && (
             <p className="inbuilt-note" style={{ marginTop: 8 }}>
               <strong>This is a inbuilt feature of this credit card</strong>
@@ -871,7 +733,6 @@ const HotelOffers = () => {
 
   return (
     <div className="App" style={{ fontFamily: "'Libre Baskerville', serif" }}>
-
       {/* 🔹 Cards-with-offers strip container */}
       {(marqueeCC.length > 0 || marqueeDC.length > 0) && (
         <div
@@ -892,7 +753,7 @@ const HotelOffers = () => {
               color: "#1F2D45",
               marginBottom: 10,
               display: "flex",
-              justifyContent:"center",
+              justifyContent: "center",
               gap: 8,
             }}
           >
@@ -933,7 +794,7 @@ const HotelOffers = () => {
             </marquee>
           )}
 
-          {/* DC marquee chips */}
+          {/* DC marquee chips — ONLY from offer CSVs */}
           {marqueeDC.length > 0 && (
             <marquee direction="left" scrollAmount="4" style={{ whiteSpace: "nowrap" }}>
               <strong style={{ marginRight: 10, color: "#1F2D45" }}>Debit Cards:</strong>
@@ -1094,9 +955,7 @@ const HotelOffers = () => {
       )}
 
       {selected && !hasAny && !noMatches && (
-        <p style={{ color: "#d32f2f", textAlign: "center", marginTop: 10 }}>
-          No offer available for this card
-        </p>
+        <p style={{ color: "#d32f2f", textAlign: "center", marginTop: 10 }}>No offer available for this card</p>
       )}
 
       {selected && hasAny && !noMatches && (
