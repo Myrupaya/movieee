@@ -780,7 +780,7 @@ const HotelOffers = () => {
                       maxHeight: 140,
                       overflowY: "auto",
                       paddingRight: 8,
-                      border: "1px solid "#eee",
+                      border: "1px solid #eee",
                       borderRadius: 6,
                       padding: "10px 12px",
                       background: "#fafafa",
