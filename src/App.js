@@ -740,7 +740,7 @@ const HotelOffers = () => {
   const wPVR = matchesFor(
     pvrOffers,
     selected?.type === "debit" ? "debit" : "credit",
-    "PVR and Inox"
+    "PVR"
   );
 
   const seen = new Set();
