@@ -32,7 +32,7 @@ const SCROLL_SITES = new Set([
   "Bookmyshow",
   "Cinepolis",
   "Paytm and District",
-  "PVR",
+  "PVR and Inox",
 ]);
 
 /** -------------------- HELPERS -------------------- */
