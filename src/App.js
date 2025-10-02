@@ -1157,7 +1157,7 @@ const HotelOffers = () => {
 
           {!!dPVR.length && (
             <div className="offer-group">
-              <h2 style={{ textAlign: "center" }}>Offers on PVR</h2>
+              <h2 style={{ textAlign: "center" }}>Offers on PVR and Inox</h2>
               <div className="offer-grid">
                 {dPVR.map((w, i) => (
                   <OfferCard key={`pvr-${i}`} wrapper={w} />
