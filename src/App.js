@@ -366,10 +366,10 @@ const HotelOffers = () => {
         console.debug("[HotelOffers] Loading permanent_offers.csv …");
 
         const specs = [
-          { key: "BMS", name: "bookmyshow.csv", setter: setBMSOffers },
+          { key: "BMS", name: "Bookmyshow.csv", setter: setBMSOffers },
           { key: "CINE", name: "cinepolis.csv", setter: setCinepolisOffers },
           { key: "PAYTM", name: "district_paytm.csv", setter: setPaytmDistrictOffers },
-          { key: "PVR", name: "pvr.csv", setter: setPVROffers },
+          { key: "PVR", name: "PVR.csv", setter: setPVROffers },
           { key: "PERM", name: "permanent_offers.csv", setter: setPermanentOffers },
         ];
 
