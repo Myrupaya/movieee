@@ -32,7 +32,7 @@ const SCROLL_SITES = new Set([
   "Bookmyshow",
   "Cinepolis",
   "Paytm and District",
-  "PVR and Inox",
+  "PVR",
 ]);
 
 /** -------------------- HELPERS -------------------- */
@@ -740,7 +740,7 @@ const HotelOffers = () => {
   const wPVR = matchesFor(
     pvrOffers,
     selected?.type === "debit" ? "debit" : "credit",
-    "PVR"
+    "PVR and Inox"
   );
 
   const seen = new Set();
