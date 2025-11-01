@@ -677,7 +677,7 @@ const HotelOffers = () => {
 
     if (siteKey === "bookmyshow" || siteKey === "cinepolis") {
       title = getCI(o, "Offer") ?? title;
-      desc = getCI(o, "Offer Description") ?? desc;
+      desc = getCI(o, "Terms and Conditions") ?? desc;
       image = getCI(o, "Image") ?? image;
       link = getCI(o, "Link") ?? link;
     } else if (siteKey === "paytm and district") {
