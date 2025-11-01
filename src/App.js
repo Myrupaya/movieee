@@ -7,7 +7,7 @@ import "./App.css";
 const LIST_FIELDS = {
   credit: ["Eligible Credit Cards", "Eligible Cards"],
   debit: ["Eligible Debit Cards", "Applicable Debit Cards"],
-  title: ["Offer Title", "Title"],
+  title: ["Offer Title", "Title", "Offer"],
   image: ["Image", "Credit Card Image", "Offer Image", "image", "Image URL"],
   link: ["Link", "Offer Link"],
   desc: ["Description", "Details", "Offer Description", "Flight Benefit"],
@@ -678,14 +678,14 @@ const HotelOffers = () => {
     if (siteKey === "bookmyshow" || siteKey === "cinepolis") {
       title = getCI(o, "Offer") ?? title;
       desc = getCI(o, "Offer Description") ?? desc;
-      image = getCI(o, "Images") ?? image;
+      image = getCI(o, "Image") ?? image;
       link = getCI(o, "Link") ?? link;
     } else if (siteKey === "paytm and district") {
       couponCode = getCI(o, "Coupon Code");
-      terms = getCI(o, "Terms and conditions");
+      terms = getCI(o, "Terms and Conditions");
     } else if (siteKey === "pvr") {
       title = getCI(o, "Offer") ?? title;
-      terms = getCI(o, "Terms and conditions");
+      terms = getCI(o, "Terms and Conditions");
       link = getCI(o, "Link") ?? link;
       image = getCI(o, "Image") ?? image;
       if (terms) desc = terms;
