@@ -280,6 +280,19 @@ function valueLooksCredit(s) {
   return /\bcredit\b/i.test(String(s || ""));
 }
 
+/** 🔹 NEW: does the query contain a word similar to "select"? (handles "selct", "selet", etc.) */
+function hasSelectLikeWord(text) {
+  const qs = toNorm(text);
+  if (!qs) return false;
+  const words = qs.split(" ").filter(Boolean);
+  for (const w of words) {
+    if (w === "select") return true;
+    // allow small typos: distance <= 2
+    if (lev(w, "select") <= 2) return true;
+  }
+  return false;
+}
+
 /** Disclaimer */
 const Disclaimer = () => (
   <section className="disclaimer">
@@ -486,7 +499,7 @@ const HotelOffers = () => {
     setMarqueeDC(dcArr);
   }, [bmsOffers, cinepolisOffers, paytmDistrictOffers, pvrOffers, permanentOffers]);
 
-  /** 🔹 UPDATED: search box with 2 custom behaviours */
+  /** 🔹 UPDATED: search box with fuzzy "select" handling */
   const onChangeQuery = (e) => {
     const val = e.target.value;
     setQuery(val);
@@ -500,15 +513,30 @@ const HotelOffers = () => {
     }
 
     const qLower = trimmed.toLowerCase();
+    const queryHasSelectLike = hasSelectLikeWord(trimmed);
 
     const scored = (arr) =>
       arr
         .map((it) => {
           const s = scoreCandidate(trimmed, it.display);
-          const inc = it.display.toLowerCase().includes(qLower);
-          return { it, s, inc };
+          const labelNorm = toNorm(it.display);
+          const inc = labelNorm.includes(qLower);
+
+          // label has a real "select" word?
+          const labelWords = labelNorm.split(" ").filter(Boolean);
+          const labelHasSelectWord = labelWords.some(
+            (w) => w === "select" || lev(w, "select") <= 1
+          );
+
+          const passesFuzzySelect =
+            queryHasSelectLike && labelHasSelectWord;
+
+          return { it, s, inc, passesFuzzySelect, labelNorm };
         })
-        .filter(({ s, inc }) => inc || s > 0.3)
+        // 🧠 keep items if:
+        //  - normal match (substring or score > 0.3)
+        //  - OR query looks like "select" and this card has a "select" word
+        .filter(({ s, inc, passesFuzzySelect }) => inc || s > 0.3 || passesFuzzySelect)
         .sort((a, b) => b.s - a.s || a.it.display.localeCompare(b.it.display))
         .slice(0, MAX_SUGGESTIONS)
         .map(({ it }) => it);
@@ -525,51 +553,33 @@ const HotelOffers = () => {
 
     setNoMatches(false);
 
-    /** --- SPECIAL CASE 1: "select credit card" → push those matches to top --- */
-    const PRIORITY_SELECT = "select credit card";
-    if (qLower.includes(PRIORITY_SELECT)) {
-      const reorderBySelect = (arr) => {
-        const exact = [];
-        const contains = [];
+    // If query looks like "select" → push all "Select" cards to the top
+    if (queryHasSelectLike) {
+      const bumpSelectCards = (arr) => {
+        const selectOnTop = [];
         const rest = [];
         arr.forEach((item) => {
-          const label = item.display.toLowerCase();
-          if (label === PRIORITY_SELECT) exact.push(item);
-          else if (label.includes(PRIORITY_SELECT)) contains.push(item);
+          const norm = toNorm(item.display);
+          const words = norm.split(" ").filter(Boolean);
+          const hasSelectWord = words.some(
+            (w) => w === "select" || lev(w, "select") <= 1
+          );
+          if (hasSelectWord) selectOnTop.push(item);
           else rest.push(item);
         });
-        return [...exact, ...contains, ...rest];
+        return [...selectOnTop, ...rest];
       };
-      cc = reorderBySelect(cc);
-      dc = reorderBySelect(dc);
+      cc = bumpSelectCards(cc);
+      dc = bumpSelectCards(dc);
     }
 
-    /** --- SPECIAL CASE 2: query mentions dc / debit / debit card → debit list first --- */
-    const mentionsDebit =
-      qLower.includes("debit card") ||
-      qLower.includes("debit") ||
-      qLower.includes(" dc") ||
-      qLower.startsWith("dc ") ||
-      qLower.endsWith(" dc") ||
-      qLower === "dc";
-
-    if (mentionsDebit) {
-      // Debit section first, then credit
-      setFilteredCards([
-        ...(dc.length ? [{ type: "heading", label: "Debit Cards" }] : []),
-        ...dc,
-        ...(cc.length ? [{ type: "heading", label: "Credit Cards" }] : []),
-        ...cc,
-      ]);
-    } else {
-      // Default: Credit first, then debit
-      setFilteredCards([
-        ...(cc.length ? [{ type: "heading", label: "Credit Cards" }] : []),
-        ...cc,
-        ...(dc.length ? [{ type: "heading", label: "Debit Cards" }] : []),
-        ...dc,
-      ]);
-    }
+    // Default: Credit first, then Debit (no special dc/debit logic requested here)
+    setFilteredCards([
+      ...(cc.length ? [{ type: "heading", label: "Credit Cards" }] : []),
+      ...cc,
+      ...(dc.length ? [{ type: "heading", label: "Debit Cards" }] : []),
+      ...dc,
+    ]);
   };
 
   const onPick = (entry) => {
@@ -1014,8 +1024,7 @@ const HotelOffers = () => {
               width: "100%",
               maxHeight: "260px",
               overflowY: "auto",
-              border: "1px solid " +
-                "#ccc",
+              border: "1px solid " + "#ccc",
               borderRadius: "6px",
               backgroundColor: "#fff",
               position: "absolute",
