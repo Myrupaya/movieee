@@ -171,7 +171,8 @@ function brandCanonicalize(text) {
 function lev(a, b) {
   a = toNorm(a);
   b = toNorm(b);
-  const n = a.length, m = b.length;
+  const n = a.length,
+    m = b.length;
   if (!n) return m;
   if (!m) return n;
   const d = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
@@ -485,23 +486,26 @@ const HotelOffers = () => {
     setMarqueeDC(dcArr);
   }, [bmsOffers, cinepolisOffers, paytmDistrictOffers, pvrOffers, permanentOffers]);
 
+  /** 🔹 UPDATED: search box with 2 custom behaviours */
   const onChangeQuery = (e) => {
     const val = e.target.value;
     setQuery(val);
 
-    if (!val.trim()) {
+    const trimmed = val.trim();
+    if (!trimmed) {
       setFilteredCards([]);
       setSelected(null);
       setNoMatches(false);
       return;
     }
 
-    const q = val.trim().toLowerCase();
+    const qLower = trimmed.toLowerCase();
+
     const scored = (arr) =>
       arr
         .map((it) => {
-          const s = scoreCandidate(val, it.display);
-          const inc = it.display.toLowerCase().includes(q);
+          const s = scoreCandidate(trimmed, it.display);
+          const inc = it.display.toLowerCase().includes(qLower);
           return { it, s, inc };
         })
         .filter(({ s, inc }) => inc || s > 0.3)
@@ -509,8 +513,8 @@ const HotelOffers = () => {
         .slice(0, MAX_SUGGESTIONS)
         .map(({ it }) => it);
 
-    const cc = scored(creditEntries);
-    const dc = scored(debitEntries);
+    let cc = scored(creditEntries);
+    let dc = scored(debitEntries);
 
     if (!cc.length && !dc.length) {
       setNoMatches(true);
@@ -520,12 +524,52 @@ const HotelOffers = () => {
     }
 
     setNoMatches(false);
-    setFilteredCards([
-      ...(cc.length ? [{ type: "heading", label: "Credit Cards" }] : []),
-      ...cc,
-      ...(dc.length ? [{ type: "heading", label: "Debit Cards" }] : []),
-      ...dc,
-    ]);
+
+    /** --- SPECIAL CASE 1: "select credit card" → push those matches to top --- */
+    const PRIORITY_SELECT = "select credit card";
+    if (qLower.includes(PRIORITY_SELECT)) {
+      const reorderBySelect = (arr) => {
+        const exact = [];
+        const contains = [];
+        const rest = [];
+        arr.forEach((item) => {
+          const label = item.display.toLowerCase();
+          if (label === PRIORITY_SELECT) exact.push(item);
+          else if (label.includes(PRIORITY_SELECT)) contains.push(item);
+          else rest.push(item);
+        });
+        return [...exact, ...contains, ...rest];
+      };
+      cc = reorderBySelect(cc);
+      dc = reorderBySelect(dc);
+    }
+
+    /** --- SPECIAL CASE 2: query mentions dc / debit / debit card → debit list first --- */
+    const mentionsDebit =
+      qLower.includes("debit card") ||
+      qLower.includes("debit") ||
+      qLower.includes(" dc") ||
+      qLower.startsWith("dc ") ||
+      qLower.endsWith(" dc") ||
+      qLower === "dc";
+
+    if (mentionsDebit) {
+      // Debit section first, then credit
+      setFilteredCards([
+        ...(dc.length ? [{ type: "heading", label: "Debit Cards" }] : []),
+        ...dc,
+        ...(cc.length ? [{ type: "heading", label: "Credit Cards" }] : []),
+        ...cc,
+      ]);
+    } else {
+      // Default: Credit first, then debit
+      setFilteredCards([
+        ...(cc.length ? [{ type: "heading", label: "Credit Cards" }] : []),
+        ...cc,
+        ...(dc.length ? [{ type: "heading", label: "Debit Cards" }] : []),
+        ...dc,
+      ]);
+    }
   };
 
   const onPick = (entry) => {
@@ -807,7 +851,7 @@ const HotelOffers = () => {
             <div
               className="offer-desc"
               style={
-                useScroll
+                SCROLL_SITES.has(wrapper.site)
                   ? {
                       maxHeight: 140,
                       overflowY: "auto",
@@ -970,7 +1014,8 @@ const HotelOffers = () => {
               width: "100%",
               maxHeight: "260px",
               overflowY: "auto",
-              border: "1px solid #ccc",
+              border: "1px solid " +
+                "#ccc",
               borderRadius: "6px",
               backgroundColor: "#fff",
               position: "absolute",
