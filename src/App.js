@@ -14,6 +14,10 @@ const LIST_FIELDS = {
   // Permanent (inbuilt) CSV fields
   permanentCCName: ["Credit Card Name"],
   permanentBenefit: ["Movie Benefit", "Benefit", "Offer", "Hotel Benefit"],
+
+  // ✅ NEW: UPI / NetBanking fields
+  upi: ["UPI", "Upi", "UPI Options", "UPI Method"],
+  netbanking: ["NetBanking", "Net Banking", "Netbanking", "NetBanking Options"],
 };
 
 const MAX_SUGGESTIONS = 50;
@@ -312,9 +316,15 @@ const Disclaimer = () => (
 const HotelOffers = () => {
   const [creditEntries, setCreditEntries] = useState([]);
   const [debitEntries, setDebitEntries] = useState([]);
+  // ✅ NEW
+  const [upiEntries, setUpiEntries] = useState([]);
+  const [netbankingEntries, setNetbankingEntries] = useState([]);
 
   const [marqueeCC, setMarqueeCC] = useState([]);
   const [marqueeDC, setMarqueeDC] = useState([]);
+  // ✅ NEW
+  const [marqueeUPI, setMarqueeUPI] = useState([]);
+  const [marqueeNB, setMarqueeNB] = useState([]);
 
   const [filteredCards, setFilteredCards] = useState([]);
   const [query, setQuery] = useState("");
@@ -344,6 +354,9 @@ const HotelOffers = () => {
 
         const creditMap = new Map();
         const debitMap = new Map();
+        // ✅ NEW
+        const upiMap = new Map();
+        const nbMap = new Map();
 
         for (const row of rows) {
           const ccList = splitList(firstField(row, LIST_FIELDS.credit));
@@ -358,6 +371,21 @@ const HotelOffers = () => {
             const baseNorm = toNorm(base);
             if (baseNorm) debitMap.set(baseNorm, debitMap.get(baseNorm) || base);
           }
+
+          // ✅ NEW: UPI + NetBanking from allCards.csv
+          const upiList = splitList(firstField(row, LIST_FIELDS.upi));
+          for (const raw of upiList) {
+            const base = brandCanonicalize(getBase(raw));
+            const baseNorm = toNorm(base);
+            if (baseNorm) upiMap.set(baseNorm, upiMap.get(baseNorm) || base);
+          }
+
+          const nbList = splitList(firstField(row, LIST_FIELDS.netbanking));
+          for (const raw of nbList) {
+            const base = brandCanonicalize(getBase(raw));
+            const baseNorm = toNorm(base);
+            if (baseNorm) nbMap.set(baseNorm, nbMap.get(baseNorm) || base);
+          }
         }
 
         const credit = Array.from(creditMap.values())
@@ -367,17 +395,32 @@ const HotelOffers = () => {
           .sort((a, b) => a.localeCompare(b))
           .map((d) => makeEntry(d, "debit"));
 
+        // ✅ NEW
+        const upi = Array.from(upiMap.values())
+          .sort((a, b) => a.localeCompare(b))
+          .map((d) => makeEntry(d, "upi"));
+        const netbanking = Array.from(nbMap.values())
+          .sort((a, b) => a.localeCompare(b))
+          .map((d) => makeEntry(d, "netbanking"));
+
         setCreditEntries(credit);
         setDebitEntries(debit);
+        // ✅ NEW
+        setUpiEntries(upi);
+        setNetbankingEntries(netbanking);
 
         setFilteredCards([
           ...(credit.length ? [{ type: "heading", label: "Credit Cards" }] : []),
           ...credit,
           ...(debit.length ? [{ type: "heading", label: "Debit Cards" }] : []),
           ...debit,
+          ...(upi.length ? [{ type: "heading", label: "UPI" }] : []),
+          ...upi,
+          ...(netbanking.length ? [{ type: "heading", label: "NetBanking" }] : []),
+          ...netbanking,
         ]);
 
-        if (!credit.length && !debit.length) {
+        if (!credit.length && !debit.length && !upi.length && !netbanking.length) {
           setNoMatches(true);
           setSelected(null);
         }
@@ -414,9 +457,75 @@ const HotelOffers = () => {
     })();
   }, []);
 
+  // ✅ NEW: Ensure dropdown has UPI/NetBanking entries even if allCards.csv doesn’t include them
+  useEffect(() => {
+    const upiMap = new Map();
+    const nbMap = new Map();
+
+    const harvest = (rows) => {
+      for (const o of rows || []) {
+        const upiField =
+          firstField(o, LIST_FIELDS.upi) || firstFieldByContains(o, "upi");
+        if (upiField) {
+          for (const raw of splitList(upiField)) {
+            const base = brandCanonicalize(getBase(raw));
+            const baseNorm = toNorm(base);
+            if (baseNorm) upiMap.set(baseNorm, upiMap.get(baseNorm) || base);
+          }
+        }
+
+        const nbField =
+          firstField(o, LIST_FIELDS.netbanking) ||
+          firstFieldByContains(o, "netbank") ||
+          firstFieldByContains(o, "net banking");
+        if (nbField) {
+          for (const raw of splitList(nbField)) {
+            const base = brandCanonicalize(getBase(raw));
+            const baseNorm = toNorm(base);
+            if (baseNorm) nbMap.set(baseNorm, nbMap.get(baseNorm) || base);
+          }
+        }
+      }
+    };
+
+    harvest(bmsOffers);
+    harvest(cinepolisOffers);
+    harvest(paytmDistrictOffers);
+    harvest(pvrOffers);
+
+    const upiFromOffers = Array.from(upiMap.values())
+      .sort((a, b) => a.localeCompare(b))
+      .map((d) => makeEntry(d, "upi"));
+
+    const nbFromOffers = Array.from(nbMap.values())
+      .sort((a, b) => a.localeCompare(b))
+      .map((d) => makeEntry(d, "netbanking"));
+
+    setUpiEntries((prev) => {
+      const m = new Map();
+      (prev || []).forEach((e) => e?.baseNorm && m.set(e.baseNorm, e));
+      (upiFromOffers || []).forEach((e) => {
+        if (e?.baseNorm && !m.has(e.baseNorm)) m.set(e.baseNorm, e);
+      });
+      return Array.from(m.values()).sort((a, b) => a.display.localeCompare(b.display));
+    });
+
+    setNetbankingEntries((prev) => {
+      const m = new Map();
+      (prev || []).forEach((e) => e?.baseNorm && m.set(e.baseNorm, e));
+      (nbFromOffers || []).forEach((e) => {
+        if (e?.baseNorm && !m.has(e.baseNorm)) m.set(e.baseNorm, e);
+      });
+      return Array.from(m.values()).sort((a, b) => a.display.localeCompare(b.display));
+    });
+  }, [bmsOffers, cinepolisOffers, paytmDistrictOffers, pvrOffers]);
+
   useEffect(() => {
     const ccMap = new Map();
     const dcMap = new Map();
+    // ✅ NEW
+    const upiMap = new Map();
+    const nbMap = new Map();
 
     const harvestList = (val, targetMap) => {
       for (const raw of splitList(val)) {
@@ -462,8 +571,19 @@ const HotelOffers = () => {
           return /\bcredit\b/.test(lk) && /\bcards?\b/.test(lk);
         });
 
+        // ✅ NEW: UPI + NetBanking headers
+        const upiHeaders = entriesWhereKey(o, (k) => /\bupi\b/i.test(k));
+        const nbHeaders = entriesWhereKey(
+          o,
+          (k) => /\bnetbank\b/i.test(k) || /net\s*bank/i.test(k)
+        );
+
         debitHeaders.forEach(({ value }) => harvestList(value, dcMap));
         creditHeaders.forEach(({ value }) => harvestList(value, ccMap));
+
+        // ✅ NEW
+        upiHeaders.forEach(({ value }) => harvestList(value, upiMap));
+        nbHeaders.forEach(({ value }) => harvestList(value, nbMap));
 
         const mixedHeaders = entriesWhereKey(
           o,
@@ -494,12 +614,18 @@ const HotelOffers = () => {
 
     const ccArr = Array.from(ccMap.values()).sort((a, b) => a.localeCompare(b));
     const dcArr = Array.from(dcMap.values()).sort((a, b) => a.localeCompare(b));
+    // ✅ NEW
+    const upiArr = Array.from(upiMap.values()).sort((a, b) => a.localeCompare(b));
+    const nbArr = Array.from(nbMap.values()).sort((a, b) => a.localeCompare(b));
 
     setMarqueeCC(ccArr);
     setMarqueeDC(dcArr);
+    // ✅ NEW
+    setMarqueeUPI(upiArr);
+    setMarqueeNB(nbArr);
   }, [bmsOffers, cinepolisOffers, paytmDistrictOffers, pvrOffers, permanentOffers]);
 
-  /** 🔹 UPDATED: search box with fuzzy "select" handling */
+  /** 🔹 UPDATED: search box with fuzzy "select" handling + UPI/NetBanking */
   const onChangeQuery = (e) => {
     const val = e.target.value;
     setQuery(val);
@@ -513,10 +639,11 @@ const HotelOffers = () => {
     }
 
     const qLower = trimmed.toLowerCase();
+    const qNorm = toNorm(trimmed);
     const queryHasSelectLike = hasSelectLikeWord(trimmed);
 
     const scored = (arr) =>
-      arr
+      (arr || [])
         .map((it) => {
           const s = scoreCandidate(trimmed, it.display);
           const labelNorm = toNorm(it.display);
@@ -533,18 +660,32 @@ const HotelOffers = () => {
 
           return { it, s, inc, passesFuzzySelect, labelNorm };
         })
-        // 🧠 keep items if:
-        //  - normal match (substring or score > 0.3)
-        //  - OR query looks like "select" and this card has a "select" word
         .filter(({ s, inc, passesFuzzySelect }) => inc || s > 0.3 || passesFuzzySelect)
         .sort((a, b) => b.s - a.s || a.it.display.localeCompare(b.it.display))
         .slice(0, MAX_SUGGESTIONS)
         .map(({ it }) => it);
 
+    // ✅ NEW: keyword detection for UPI / NetBanking
+    const mentionsUPI = qNorm === "upi" || /\bupi\b/i.test(trimmed);
+    const mentionsNetBanking =
+      qNorm === "netbanking" ||
+      qNorm === "net banking" ||
+      /net\s*bank/i.test(trimmed);
+
+    // If user types ONLY "upi" / "netbanking" -> show ALL of those entries
+    const upiList =
+      qNorm === "upi"
+        ? (upiEntries || []).slice(0, MAX_SUGGESTIONS)
+        : scored(upiEntries);
+    const nbList =
+      qNorm === "netbanking" || qNorm === "net banking"
+        ? (netbankingEntries || []).slice(0, MAX_SUGGESTIONS)
+        : scored(netbankingEntries);
+
     let cc = scored(creditEntries);
     let dc = scored(debitEntries);
 
-    if (!cc.length && !dc.length) {
+    if (!cc.length && !dc.length && !upiList.length && !nbList.length) {
       setNoMatches(true);
       setSelected(null);
       setFilteredCards([]);
@@ -573,13 +714,32 @@ const HotelOffers = () => {
       dc = bumpSelectCards(dc);
     }
 
-    // Default: Credit first, then Debit (no special dc/debit logic requested here)
-    setFilteredCards([
-      ...(cc.length ? [{ type: "heading", label: "Credit Cards" }] : []),
-      ...cc,
-      ...(dc.length ? [{ type: "heading", label: "Debit Cards" }] : []),
-      ...dc,
-    ]);
+    const buildList = (order) => {
+      const out = [];
+      for (const sec of order) {
+        if (sec === "upi" && upiList.length) out.push({ type: "heading", label: "UPI" }, ...upiList);
+        if (sec === "netbanking" && nbList.length)
+          out.push({ type: "heading", label: "NetBanking" }, ...nbList);
+        if (sec === "credit" && cc.length)
+          out.push({ type: "heading", label: "Credit Cards" }, ...cc);
+        if (sec === "debit" && dc.length)
+          out.push({ type: "heading", label: "Debit Cards" }, ...dc);
+      }
+      return out;
+    };
+
+    // ✅ If query indicates NetBanking / UPI, show those sections at TOP
+    if (mentionsNetBanking) {
+      setFilteredCards(buildList(["netbanking", "upi", "credit", "debit"]));
+      return;
+    }
+    if (mentionsUPI) {
+      setFilteredCards(buildList(["upi", "netbanking", "credit", "debit"]));
+      return;
+    }
+
+    // Default: Credit, Debit, UPI, NetBanking
+    setFilteredCards(buildList(["credit", "debit", "upi", "netbanking"]));
   };
 
   const onPick = (entry) => {
@@ -608,6 +768,17 @@ const HotelOffers = () => {
           firstField(o, LIST_FIELDS.permanentCCName) ||
           firstFieldByContains(o, "credit card name");
         if (nm) list = [nm];
+      } else if (type === "upi") {
+        const upi =
+          firstField(o, LIST_FIELDS.upi) ||
+          firstFieldByContains(o, "upi");
+        list = splitList(upi);
+      } else if (type === "netbanking") {
+        const nb =
+          firstField(o, LIST_FIELDS.netbanking) ||
+          firstFieldByContains(o, "netbank") ||
+          firstFieldByContains(o, "net banking");
+        list = splitList(nb);
       } else if (type === "debit") {
         const dcExplicit =
           firstField(o, LIST_FIELDS.debit) ||
@@ -658,30 +829,28 @@ const HotelOffers = () => {
     return out;
   }
 
+  const selectedMatchType =
+    selected?.type === "debit"
+      ? "debit"
+      : selected?.type === "upi"
+      ? "upi"
+      : selected?.type === "netbanking"
+      ? "netbanking"
+      : "credit";
+
   const wPermanent = matchesFor(permanentOffers, "permanent", "Permanent");
-  const wBMS = matchesFor(
-    bmsOffers,
-    selected?.type === "debit" ? "debit" : "credit",
-    "Bookmyshow"
-  );
-  const wCinepolis = matchesFor(
-    cinepolisOffers,
-    selected?.type === "debit" ? "debit" : "credit",
-    "Cinepolis"
-  );
+  const wBMS = matchesFor(bmsOffers, selectedMatchType, "Bookmyshow");
+  const wCinepolis = matchesFor(cinepolisOffers, selectedMatchType, "Cinepolis");
   const wPaytmDistrict = matchesFor(
     paytmDistrictOffers,
-    selected?.type === "debit" ? "debit" : "credit",
+    selectedMatchType,
     "Paytm and District"
   );
-  const wPVR = matchesFor(
-    pvrOffers,
-    selected?.type === "debit" ? "debit" : "credit",
-    "PVR"
-  );
+  const wPVR = matchesFor(pvrOffers, selectedMatchType, "PVR");
 
   const seen = new Set();
-  const dPermanent = dedupWrappers(wPermanent, seen);
+  const dPermanent =
+    selected?.type === "credit" ? dedupWrappers(wPermanent, seen) : [];
   const dBMS = dedupWrappers(wBMS, seen);
   const dCinepolis = dedupWrappers(wCinepolis, seen);
   const dPaytmDistrict = dedupWrappers(wPaytmDistrict, seen);
@@ -694,6 +863,12 @@ const HotelOffers = () => {
       dPaytmDistrict.length ||
       dPVR.length
   );
+
+  const sectionHeading = (siteLabel, defaultHeading) => {
+    if (selected?.type === "upi") return `UPI offers on ${siteLabel}`;
+    if (selected?.type === "netbanking") return `NetBanking offers on ${siteLabel}`;
+    return defaultHeading;
+  };
 
   const OfferCard = ({ wrapper, isPermanent = false }) => {
     const [copied, setCopied] = useState(false);
@@ -904,7 +1079,7 @@ const HotelOffers = () => {
 
   return (
     <div className="App" style={{ fontFamily: "'Libre Baskerville', serif" }}>
-      {(marqueeCC.length > 0 || marqueeDC.length > 0) && (
+      {(marqueeCC.length > 0 || marqueeDC.length > 0 || marqueeUPI.length > 0 || marqueeNB.length > 0) && (
         <div
           style={{
             maxWidth: 1200,
@@ -927,7 +1102,7 @@ const HotelOffers = () => {
               gap: 8,
             }}
           >
-            <span>Credit And Debit Cards Which Have Offers</span>
+            <span>Credit, Debit, UPI And NetBanking Options Which Have Offers</span>
           </div>
 
           {marqueeCC.length > 0 && (
@@ -964,7 +1139,7 @@ const HotelOffers = () => {
           )}
 
           {marqueeDC.length > 0 && (
-            <marquee direction="left" scrollamount="4" style={{ whiteSpace: "nowrap" }}>
+            <marquee direction="left" scrollamount="4" style={{ marginBottom: 8, whiteSpace: "nowrap" }}>
               <strong style={{ marginRight: 10, color: "#1F2D45" }}>Debit Cards:</strong>
               {marqueeDC.map((name, idx) => (
                 <span
@@ -989,6 +1164,74 @@ const HotelOffers = () => {
                   onMouseOver={(e) => (e.currentTarget.style.background = "#F0F5FF")}
                   onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
                   title="Click to select this card"
+                >
+                  {name}
+                </span>
+              ))}
+            </marquee>
+          )}
+
+          {/* ✅ NEW: UPI strip */}
+          {marqueeUPI.length > 0 && (
+            <marquee direction="left" scrollamount="4" style={{ marginBottom: 8, whiteSpace: "nowrap" }}>
+              <strong style={{ marginRight: 10, color: "#1F2D45" }}>UPI:</strong>
+              {marqueeUPI.map((name, idx) => (
+                <span
+                  key={`upi-chip-${idx}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleChipClick(name, "upi")}
+                  onKeyDown={(e) => (e.key === "Enter" ? handleChipClick(name, "upi") : null)}
+                  style={{
+                    display: "inline-block",
+                    padding: "6px 10px",
+                    border: "1px solid #E0E6EE",
+                    borderRadius: 9999,
+                    marginRight: 8,
+                    background: "#fff",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                    cursor: "pointer",
+                    fontSize: 14,
+                    lineHeight: 1.2,
+                    userSelect: "none",
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = "#F0F5FF")}
+                  onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
+                  title="Click to select this UPI option"
+                >
+                  {name}
+                </span>
+              ))}
+            </marquee>
+          )}
+
+          {/* ✅ NEW: NetBanking strip */}
+          {marqueeNB.length > 0 && (
+            <marquee direction="left" scrollamount="4" style={{ whiteSpace: "nowrap" }}>
+              <strong style={{ marginRight: 10, color: "#1F2D45" }}>NetBanking:</strong>
+              {marqueeNB.map((name, idx) => (
+                <span
+                  key={`nb-chip-${idx}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleChipClick(name, "netbanking")}
+                  onKeyDown={(e) => (e.key === "Enter" ? handleChipClick(name, "netbanking") : null)}
+                  style={{
+                    display: "inline-block",
+                    padding: "6px 10px",
+                    border: "1px solid #E0E6EE",
+                    borderRadius: 9999,
+                    marginRight: 8,
+                    background: "#fff",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                    cursor: "pointer",
+                    fontSize: 14,
+                    lineHeight: 1.2,
+                    userSelect: "none",
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.background = "#F0F5FF")}
+                  onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
+                  title="Click to select this NetBanking option"
                 >
                   {name}
                 </span>
@@ -1061,7 +1304,9 @@ const HotelOffers = () => {
         <div className="offers-section" style={{ maxWidth: 1200, margin: "0 auto", padding: 20 }}>
           {!!dBMS.length && (
             <div className="offer-group">
-              <h2 style={{ textAlign: "center" }}>Offers on Bookmyshow</h2>
+              <h2 style={{ textAlign: "center" }}>
+                {sectionHeading("Bookmyshow", "Offers on Bookmyshow")}
+              </h2>
               <div className="offer-grid">
                 {dBMS.map((w, i) => (
                   <OfferCard key={`bms-${i}`} wrapper={w} />
@@ -1072,7 +1317,9 @@ const HotelOffers = () => {
 
           {!!dCinepolis.length && (
             <div className="offer-group">
-              <h2 style={{ textAlign: "center" }}>Offers on Cinepolis</h2>
+              <h2 style={{ textAlign: "center" }}>
+                {sectionHeading("Cinepolis", "Offers on Cinepolis")}
+              </h2>
               <div className="offer-grid">
                 {dCinepolis.map((w, i) => (
                   <OfferCard key={`cine-${i}`} wrapper={w} />
@@ -1083,7 +1330,9 @@ const HotelOffers = () => {
 
           {!!dPaytmDistrict.length && (
             <div className="offer-group">
-              <h2 style={{ textAlign: "center" }}>Offers on Paytm and District</h2>
+              <h2 style={{ textAlign: "center" }}>
+                {sectionHeading("Paytm and District", "Offers on Paytm and District")}
+              </h2>
               <div className="offer-grid">
                 {dPaytmDistrict.map((w, i) => (
                   <OfferCard key={`pd-${i}`} wrapper={w} />
@@ -1094,7 +1343,9 @@ const HotelOffers = () => {
 
           {!!dPVR.length && (
             <div className="offer-group">
-              <h2 style={{ textAlign: "center" }}>Offers on PVR and Inox</h2>
+              <h2 style={{ textAlign: "center" }}>
+                {sectionHeading("PVR and Inox", "Offers on PVR and Inox")}
+              </h2>
               <div className="offer-grid">
                 {dPVR.map((w, i) => (
                   <OfferCard key={`pvr-${i}`} wrapper={w} />
