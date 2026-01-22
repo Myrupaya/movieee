@@ -255,10 +255,7 @@ const headerLooksCredit = (key) => {
   const k = String(key).toLowerCase();
   return /\bcredit\b/.test(k) && /\bcards?\b/.test(k);
 };
-const headerLooksEligibleCards = (key) => {
-  const k = String(key).toLowerCase();
-  return /\beligible\b/.test(k) && /\bcards?\b/.test(k);
-};
+
 
 function getRowTypeHint(row) {
   for (const k of Object.keys(row || {})) {
@@ -889,7 +886,7 @@ const HotelOffers = () => {
       wrapper.variantText &&
       wrapper.variantText.trim().length > 0;
 
-    const useScroll = SCROLL_SITES.has(wrapper.site);
+
 
     let image =
       firstField(o, LIST_FIELDS.image) || firstFieldByContains(o, "image");
@@ -1242,7 +1239,8 @@ const HotelOffers = () => {
       )}
 
       {/* Search / dropdown */}
-      <div className="dropdown" style={{ position: "relative", width: "600px", margin: "20px auto" }}>
+     <div className="dropdown" style={{ position: "relative", width: isMobile ? "92%" : "600px", margin: "20px auto" }}>
+
         <input
           type="text"
           value={query}
