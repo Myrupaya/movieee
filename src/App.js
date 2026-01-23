@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+// src/App.js
+import React, { useEffect, useRef, useState, useLayoutEffect} from "react";
 import axios from "axios";
 import Papa from "papaparse";
 import "./App.css";
@@ -11,6 +12,7 @@ const LIST_FIELDS = {
   image: ["Image", "Credit Card Image", "Offer Image", "image", "Image URL"],
   link: ["Link", "Offer Link"],
   desc: ["Description", "Details", "Offer Description", "Flight Benefit"],
+
   // Permanent (inbuilt) CSV fields
   permanentCCName: ["Credit Card Name"],
   permanentBenefit: ["Movie Benefit", "Benefit", "Offer", "Hotel Benefit"],
@@ -41,11 +43,11 @@ const SCROLL_SITES = new Set([
 
 /** -------------------- IMAGE FALLBACKS -------------------- */
 const FALLBACK_IMAGE_BY_SITE = {
-  "bookmyshow":
+  bookmyshow:
     "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSxj6JoEII0Me05mN-I6RL0J-SkhbNSXNKN6g&s",
-  "pvr":
+  pvr:
     "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQGdyL-nUMap7r9fqilEM0yeTX4SbArtP90Fg&s",
-  "cinepolis":
+  cinepolis:
     "https://i.pinimg.com/564x/71/d5/af/71d5afb20fcf23f071a29c6162ced302.jpg",
   "paytm and district":
     "https://logos-world.net/wp-content/uploads/2020/11/Paytm-Logo.png",
@@ -175,8 +177,8 @@ function brandCanonicalize(text) {
 function lev(a, b) {
   a = toNorm(a);
   b = toNorm(b);
-  const n = a.length,
-    m = b.length;
+  const n = a.length;
+  const m = b.length;
   if (!n) return m;
   if (!m) return n;
   const d = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
@@ -185,7 +187,11 @@ function lev(a, b) {
   for (let i = 1; i <= n; i++) {
     for (let j = 1; j <= m; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      d[i][j] = Math.min(
+        d[i - 1][j] + 1,
+        d[i][j - 1] + 1,
+        d[i - 1][j - 1] + cost
+      );
     }
   }
   return d[n][m];
@@ -256,7 +262,6 @@ const headerLooksCredit = (key) => {
   return /\bcredit\b/.test(k) && /\bcards?\b/.test(k);
 };
 
-
 function getRowTypeHint(row) {
   for (const k of Object.keys(row || {})) {
     const lk = k.toLowerCase();
@@ -293,6 +298,113 @@ function hasSelectLikeWord(text) {
   }
   return false;
 }
+
+/** ✅ Accessible marquee replacement (NO <marquee>, fixes ESLint) */
+
+
+function MarqueeChipsRow({ label, items, type, onChipClick, title }) {
+  const innerRef = useRef(null);
+  const trackRef = useRef(null);
+  const [durationSec, setDurationSec] = useState(30);
+
+  // ✅ one global speed for ALL rows (px/sec)
+  const PX_PER_SEC = 120; // lower = slower, higher = faster (pick what feels right)
+  const MIN_SEC = 22;
+  const MAX_SEC = 240;
+
+  // measure after DOM layout so widths are correct
+  useLayoutEffect(() => {
+    if (!items || items.length === 0) return;
+
+    const inner = innerRef.current;
+    const track = trackRef.current;
+    if (!inner && !track) return;
+
+    const calc = () => {
+      // movement distance is exactly 50% of inner width (because transform:-50%)
+      const innerW = inner?.scrollWidth || 0;
+      const distancePx = innerW ? innerW / 2 : (track?.scrollWidth || 0);
+
+      if (!distancePx) return;
+
+      const sec = distancePx / PX_PER_SEC;
+      setDurationSec(Math.min(MAX_SEC, Math.max(MIN_SEC, Math.ceil(sec))));
+    };
+
+    const raf1 = requestAnimationFrame(() => {
+      calc();
+      // one more frame helps when fonts/images affect width
+      requestAnimationFrame(calc);
+    });
+
+    let ro;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(calc);
+      if (inner) ro.observe(inner);
+      if (track) ro.observe(track);
+    }
+
+    window.addEventListener("resize", calc);
+
+    // if browser supports it, recalc when fonts load too
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(calc).catch(() => {});
+    }
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      window.removeEventListener("resize", calc);
+      if (ro) ro.disconnect();
+    };
+  }, [items]);
+
+  if (!items || items.length === 0) return null;
+
+  return (
+    <div className="chipMarqueeRow" aria-label={label}>
+      <strong className="chipMarqueeLabel">{label}:</strong>
+
+      <div
+        className="chipMarquee"
+        style={{ "--marquee-duration": `${durationSec}s` }}
+      >
+        <div className="chipMarqueeInner" ref={innerRef}>
+          {/* Track 1 */}
+          <div className="chipMarqueeTrack" ref={trackRef}>
+            {items.map((name, idx) => (
+              <button
+                key={`${type}-${idx}-${name}`}
+                type="button"
+                className="chipMarqueeChip"
+                onClick={() => onChipClick(name, type)}
+                title={title}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+
+          {/* Track 2 (duplicate) */}
+          <div className="chipMarqueeTrack" aria-hidden="true">
+            {items.map((name, idx) => (
+              <button
+                key={`dup-${type}-${idx}-${name}`}
+                type="button"
+                className="chipMarqueeChip"
+                onClick={() => onChipClick(name, type)}
+                tabIndex={-1}
+                title={title}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 /** Disclaimer */
 const Disclaimer = () => (
@@ -362,6 +474,7 @@ const HotelOffers = () => {
             const baseNorm = toNorm(base);
             if (baseNorm) creditMap.set(baseNorm, creditMap.get(baseNorm) || base);
           }
+
           const dcList = splitList(firstField(row, LIST_FIELDS.debit));
           for (const raw of dcList) {
             const base = brandCanonicalize(getBase(raw));
@@ -461,8 +574,7 @@ const HotelOffers = () => {
 
     const harvest = (rows) => {
       for (const o of rows || []) {
-        const upiField =
-          firstField(o, LIST_FIELDS.upi) || firstFieldByContains(o, "upi");
+        const upiField = firstField(o, LIST_FIELDS.upi) || firstFieldByContains(o, "upi");
         if (upiField) {
           for (const raw of splitList(upiField)) {
             const base = brandCanonicalize(getBase(raw));
@@ -652,8 +764,7 @@ const HotelOffers = () => {
             (w) => w === "select" || lev(w, "select") <= 1
           );
 
-          const passesFuzzySelect =
-            queryHasSelectLike && labelHasSelectWord;
+          const passesFuzzySelect = queryHasSelectLike && labelHasSelectWord;
 
           return { it, s, inc, passesFuzzySelect, labelNorm };
         })
@@ -671,9 +782,7 @@ const HotelOffers = () => {
 
     // If user types ONLY "upi" / "netbanking" -> show ALL of those entries
     const upiList =
-      qNorm === "upi"
-        ? (upiEntries || []).slice(0, MAX_SUGGESTIONS)
-        : scored(upiEntries);
+      qNorm === "upi" ? (upiEntries || []).slice(0, MAX_SUGGESTIONS) : scored(upiEntries);
     const nbList =
       qNorm === "netbanking" || qNorm === "net banking"
         ? (netbankingEntries || []).slice(0, MAX_SUGGESTIONS)
@@ -699,9 +808,7 @@ const HotelOffers = () => {
         arr.forEach((item) => {
           const norm = toNorm(item.display);
           const words = norm.split(" ").filter(Boolean);
-          const hasSelectWord = words.some(
-            (w) => w === "select" || lev(w, "select") <= 1
-          );
+          const hasSelectWord = words.some((w) => w === "select" || lev(w, "select") <= 1);
           if (hasSelectWord) selectOnTop.push(item);
           else rest.push(item);
         });
@@ -766,9 +873,7 @@ const HotelOffers = () => {
           firstFieldByContains(o, "credit card name");
         if (nm) list = [nm];
       } else if (type === "upi") {
-        const upi =
-          firstField(o, LIST_FIELDS.upi) ||
-          firstFieldByContains(o, "upi");
+        const upi = firstField(o, LIST_FIELDS.upi) || firstFieldByContains(o, "upi");
         list = splitList(upi);
       } else if (type === "netbanking") {
         const nb =
@@ -846,19 +951,14 @@ const HotelOffers = () => {
   const wPVR = matchesFor(pvrOffers, selectedMatchType, "PVR");
 
   const seen = new Set();
-  const dPermanent =
-    selected?.type === "credit" ? dedupWrappers(wPermanent, seen) : [];
+  const dPermanent = selected?.type === "credit" ? dedupWrappers(wPermanent, seen) : [];
   const dBMS = dedupWrappers(wBMS, seen);
   const dCinepolis = dedupWrappers(wCinepolis, seen);
   const dPaytmDistrict = dedupWrappers(wPaytmDistrict, seen);
   const dPVR = dedupWrappers(wPVR, seen);
 
   const hasAny = Boolean(
-    dPermanent.length ||
-      dBMS.length ||
-      dCinepolis.length ||
-      dPaytmDistrict.length ||
-      dPVR.length
+    dPermanent.length || dBMS.length || dCinepolis.length || dPaytmDistrict.length || dPVR.length
   );
 
   const sectionHeading = (siteLabel, defaultHeading) => {
@@ -886,16 +986,9 @@ const HotelOffers = () => {
       wrapper.variantText &&
       wrapper.variantText.trim().length > 0;
 
-
-
-    let image =
-      firstField(o, LIST_FIELDS.image) || firstFieldByContains(o, "image");
-    let title = isPermanent
-      ? undefined
-      : firstField(o, LIST_FIELDS.title) || o.Website;
-    let desc = isPermanent
-      ? firstField(o, LIST_FIELDS.permanentBenefit)
-      : firstField(o, LIST_FIELDS.desc);
+    let image = firstField(o, LIST_FIELDS.image) || firstFieldByContains(o, "image");
+    let title = isPermanent ? undefined : firstField(o, LIST_FIELDS.title) || o.Website;
+    let desc = isPermanent ? firstField(o, LIST_FIELDS.permanentBenefit) : firstField(o, LIST_FIELDS.desc);
     let link = firstField(o, LIST_FIELDS.link);
 
     let couponCode;
@@ -940,14 +1033,7 @@ const HotelOffers = () => {
           )}
           <div className="offer-info">
             {couponCode && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  marginBottom: 10,
-                }}
-              >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                 <span
                   style={{
                     padding: "6px 10px",
@@ -965,12 +1051,14 @@ const HotelOffers = () => {
                   aria-label="Copy coupon code"
                   title="Copy coupon code"
                   style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                  type="button"
                 >
-                  <span role="img" aria-hidden="true">📋</span> Copy
+                  <span role="img" aria-hidden="true">
+                    📋
+                  </span>{" "}
+                  Copy
                 </button>
-                {copied && (
-                  <span style={{ color: "#1e7145", fontSize: 14 }}>Copied!</span>
-                )}
+                {copied && <span style={{ color: "#1e7145", fontSize: 14 }}>Copied!</span>}
               </div>
             )}
 
@@ -995,12 +1083,13 @@ const HotelOffers = () => {
 
             {showVariantNote && (
               <p className="network-note" style={{ color: "#b00020", marginTop: 8 }}>
-                <strong>Note:</strong> This benefit is applicable only on <em>{wrapper.variantText}</em> variant
+                <strong>Note:</strong> This benefit is applicable only on{" "}
+                <em>{wrapper.variantText}</em> variant
               </p>
             )}
 
             {link && (
-              <button className="btn" onClick={() => window.open(link, "_blank")}>
+              <button className="btn" onClick={() => window.open(link, "_blank")} type="button">
                 View Offer
               </button>
             )}
@@ -1021,10 +1110,7 @@ const HotelOffers = () => {
         )}
         <div className="offer-info">
           {title && (
-            <div
-              className="offer-title"
-              style={{ fontWeight: 700, marginBottom: 8, fontSize: 16 }}
-            >
+            <div className="offer-title" style={{ fontWeight: 700, marginBottom: 8, fontSize: 16 }}>
               {title}
             </div>
           )}
@@ -1060,12 +1146,13 @@ const HotelOffers = () => {
 
           {showVariantNote && (
             <p className="network-note" style={{ color: "#b00020", marginTop: 8 }}>
-              <strong>Note:</strong> This benefit is applicable only on <em>{wrapper.variantText}</em> variant
+              <strong>Note:</strong> This benefit is applicable only on{" "}
+              <em>{wrapper.variantText}</em> variant
             </p>
           )}
 
           {link && (
-            <button className="btn" onClick={() => window.open(link, "_blank")}>
+            <button className="btn" onClick={() => window.open(link, "_blank")} type="button">
               View Offer
             </button>
           )}
@@ -1076,7 +1163,10 @@ const HotelOffers = () => {
 
   return (
     <div className="App" style={{ fontFamily: "'Libre Baskerville', serif" }}>
-      {(marqueeCC.length > 0 || marqueeDC.length > 0 || marqueeUPI.length > 0 || marqueeNB.length > 0) && (
+      {(marqueeCC.length > 0 ||
+        marqueeDC.length > 0 ||
+        marqueeUPI.length > 0 ||
+        marqueeNB.length > 0) && (
         <div
           style={{
             maxWidth: 1200,
@@ -1097,155 +1187,58 @@ const HotelOffers = () => {
               display: "flex",
               justifyContent: "center",
               gap: 8,
+              textAlign: "center",
             }}
           >
             <span>Credit, Debit, UPI And NetBanking Options Which Have Offers</span>
           </div>
 
-          {marqueeCC.length > 0 && (
-            <marquee direction="left" scrollamount="4" style={{ marginBottom: 8, whiteSpace: "nowrap" }}>
-              <strong style={{ marginRight: 10, color: "#1F2D45" }}>Credit Cards:</strong>
-              {marqueeCC.map((name, idx) => (
-                <span
-                  key={`cc-chip-${idx}`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleChipClick(name, "credit")}
-                  onKeyDown={(e) => (e.key === "Enter" ? handleChipClick(name, "credit") : null)}
-                  style={{
-                    display: "inline-block",
-                    padding: "6px 10px",
-                    border: "1px solid #E0E6EE",
-                    borderRadius: 9999,
-                    marginRight: 8,
-                    background: "#fff",
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                    cursor: "pointer",
-                    fontSize: 14,
-                    lineHeight: 1.2,
-                    userSelect: "none",
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.background = "#F0F5FF")}
-                  onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
-                  title="Click to select this card"
-                >
-                  {name}
-                </span>
-              ))}
-            </marquee>
-          )}
-
-          {marqueeDC.length > 0 && (
-            <marquee direction="left" scrollamount="4" style={{ marginBottom: 8, whiteSpace: "nowrap" }}>
-              <strong style={{ marginRight: 10, color: "#1F2D45" }}>Debit Cards:</strong>
-              {marqueeDC.map((name, idx) => (
-                <span
-                  key={`dc-chip-${idx}`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleChipClick(name, "debit")}
-                  onKeyDown={(e) => (e.key === "Enter" ? handleChipClick(name, "debit") : null)}
-                  style={{
-                    display: "inline-block",
-                    padding: "6px 10px",
-                    border: "1px solid #E0E6EE",
-                    borderRadius: 9999,
-                    marginRight: 8,
-                    background: "#fff",
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                    cursor: "pointer",
-                    fontSize: 14,
-                    lineHeight: 1.2,
-                    userSelect: "none",
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.background = "#F0F5FF")}
-                  onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
-                  title="Click to select this card"
-                >
-                  {name}
-                </span>
-              ))}
-            </marquee>
-          )}
-
-          {/* ✅ NEW: UPI strip */}
-          {marqueeUPI.length > 0 && (
-            <marquee direction="left" scrollamount="4" style={{ marginBottom: 8, whiteSpace: "nowrap" }}>
-              <strong style={{ marginRight: 10, color: "#1F2D45" }}>UPI:</strong>
-              {marqueeUPI.map((name, idx) => (
-                <span
-                  key={`upi-chip-${idx}`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleChipClick(name, "upi")}
-                  onKeyDown={(e) => (e.key === "Enter" ? handleChipClick(name, "upi") : null)}
-                  style={{
-                    display: "inline-block",
-                    padding: "6px 10px",
-                    border: "1px solid #E0E6EE",
-                    borderRadius: 9999,
-                    marginRight: 8,
-                    background: "#fff",
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                    cursor: "pointer",
-                    fontSize: 14,
-                    lineHeight: 1.2,
-                    userSelect: "none",
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.background = "#F0F5FF")}
-                  onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
-                  title="Click to select this UPI option"
-                >
-                  {name}
-                </span>
-              ))}
-            </marquee>
-          )}
-
-          {/* ✅ NEW: NetBanking strip */}
-          {marqueeNB.length > 0 && (
-            <marquee direction="left" scrollamount="4" style={{ whiteSpace: "nowrap" }}>
-              <strong style={{ marginRight: 10, color: "#1F2D45" }}>NetBanking:</strong>
-              {marqueeNB.map((name, idx) => (
-                <span
-                  key={`nb-chip-${idx}`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleChipClick(name, "netbanking")}
-                  onKeyDown={(e) => (e.key === "Enter" ? handleChipClick(name, "netbanking") : null)}
-                  style={{
-                    display: "inline-block",
-                    padding: "6px 10px",
-                    border: "1px solid #E0E6EE",
-                    borderRadius: 9999,
-                    marginRight: 8,
-                    background: "#fff",
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                    cursor: "pointer",
-                    fontSize: 14,
-                    lineHeight: 1.2,
-                    userSelect: "none",
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.background = "#F0F5FF")}
-                  onMouseOut={(e) => (e.currentTarget.style.background = "#fff")}
-                  title="Click to select this NetBanking option"
-                >
-                  {name}
-                </span>
-              ))}
-            </marquee>
-          )}
+          {/* ✅ REPLACED <marquee> with accessible CSS marquee */}
+          <MarqueeChipsRow
+            label="Credit Cards"
+            items={marqueeCC}
+            type="credit"
+            onChipClick={handleChipClick}
+            title="Click to select this card"
+          />
+          <MarqueeChipsRow
+            label="Debit Cards"
+            items={marqueeDC}
+            type="debit"
+            onChipClick={handleChipClick}
+            title="Click to select this card"
+          />
+          <MarqueeChipsRow
+            label="UPI"
+            items={marqueeUPI}
+            type="upi"
+            onChipClick={handleChipClick}
+            title="Click to select this UPI option"
+          />
+          <MarqueeChipsRow
+            label="NetBanking"
+            items={marqueeNB}
+            type="netbanking"
+            onChipClick={handleChipClick}
+            title="Click to select this NetBanking option"
+          />
         </div>
       )}
 
       {/* Search / dropdown */}
-     <div className="dropdown" style={{ position: "relative", width: isMobile ? "92%" : "600px", margin: "20px auto" }}>
-
+      <div
+        className="dropdown"
+        style={{
+          position: "relative",
+          width: isMobile ? "92%" : "600px",
+          margin: "20px auto",
+        }}
+      >
         <input
           type="text"
           value={query}
           onChange={onChangeQuery}
-          placeholder="Type a Credit or Debit Card to check the offers...."
+          placeholder="Type a Credit / Debit / UPI / NetBanking option to check the offers...."
           className="dropdown-input"
           style={{
             width: "100%",
@@ -1255,6 +1248,7 @@ const HotelOffers = () => {
             borderRadius: "6px",
           }}
         />
+
         {query.trim() && !!filteredCards.length && (
           <ul
             className="dropdown-list"
@@ -1265,7 +1259,7 @@ const HotelOffers = () => {
               width: "100%",
               maxHeight: "260px",
               overflowY: "auto",
-              border: "1px solid " + "#ccc",
+              border: "1px solid #ccc", // ✅ fixed no-useless-concat
               borderRadius: "6px",
               backgroundColor: "#fff",
               position: "absolute",
@@ -1274,7 +1268,10 @@ const HotelOffers = () => {
           >
             {filteredCards.map((item, idx) =>
               item.type === "heading" ? (
-                <li key={`h-${idx}`} style={{ padding: "8px 10px", fontWeight: 700, background: "#fafafa" }}>
+                <li
+                  key={`h-${idx}`}
+                  style={{ padding: "8px 10px", fontWeight: 700, background: "#fafafa" }}
+                >
                   {item.label}
                 </li>
               ) : (

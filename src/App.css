@@ -178,3 +178,86 @@ ul li:hover{ background:#f0f0f0; }
   .disclaimer h3{ font-size:20px; }
   .disclaimer p{ font-size:14.5px; line-height:1.7; }
 }
+
+
+/* src/App.css — ADD THIS (or merge) */
+
+/* ✅ Accessible marquee replacement (NO <marquee>) */
+.chipMarqueeRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  white-space: nowrap;
+}
+
+.chipMarqueeLabel {
+  color: #1f2d45;
+  flex: 0 0 auto;
+}
+
+.chipMarquee {
+  flex: 1 1 auto;
+  overflow: hidden;
+  position: relative;
+}
+
+.chipMarqueeInner {
+  animation: chipMarqueeScroll var(--marquee-duration, 60s) linear infinite;
+  will-change: transform;
+  display: flex;
+}
+
+.chipMarquee:hover .chipMarqueeInner {
+  animation-play-state: paused;
+}
+
+@keyframes chipMarqueeScroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    /* two tracks => -50% moves exactly one track width */
+    transform: translateX(-50%);
+  }
+}
+
+.chipMarqueeTrack {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 16px;
+}
+
+.chipMarqueeChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid #e0e6ee;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.2;
+  user-select: none;
+}
+
+.chipMarqueeChip:hover {
+  background: #f0f5ff;
+}
+
+.chipMarqueeChip:focus-visible {
+  outline: 2px solid #1f2d45;
+  outline-offset: 2px;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .chipMarqueeInner {
+    animation: none;
+  }
+  .chipMarquee {
+    overflow-x: auto;
+  }
+}
