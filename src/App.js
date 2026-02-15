@@ -64,7 +64,8 @@ function isUsableImage(val) {
 /** Decide which image to show + whether it's a fallback (logo) */
 function resolveImage(siteKey, candidate) {
   const key = String(siteKey || "").toLowerCase();
-  const fallback = FALLBACK_IMAGE_BY_SITE[key];
+  const siteFallback = FALLBACK_IMAGE_BY_SITE[key];
+  const fallback = siteFallback;
   const usingFallback = !isUsableImage(candidate) && !!fallback;
   return {
     src: usingFallback ? fallback : candidate,
@@ -925,7 +926,7 @@ const HotelOffers = () => {
         }
       }
       if (matched) {
-        out.push({ offer: o, site, variantText: matchedVariant });
+        out.push({ offer: o, site, variantText: matchedVariant, matchType: type });
       }
     }
     return out;
